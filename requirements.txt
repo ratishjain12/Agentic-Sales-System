@@ -6,4 +6,6 @@ streamlit
 requests
 pydantic
 httpx
-uvicorn 
+uvicorn
+crewai
+crewai_tools
