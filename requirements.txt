@@ -1,0 +1,9 @@
+cerebras_cloud_sdk
+exa-py
+python-dotenv
+embedchain
+streamlit
+requests
+pydantic
+httpx
+uvicorn 
