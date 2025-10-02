@@ -7,5 +7,3 @@ requests
 pydantic
 httpx
 uvicorn
-crewai
-crewai_tools

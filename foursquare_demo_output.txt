@@ -1,0 +1,57 @@
+=== Foursquare Places Agent Demo ===
+
+🔍 AGENT CAPABILITIES:
+• Search for businesses by location and type
+• Extract contact information (phone, website, address)
+• Get business ratings and price levels
+• Filter by distance and categories
+• Find business hours and operational status
+
+📋 EXAMPLE USAGE SCENARIOS:
+
+1. Restaurant Lead Finding:
+   Query: 'Find high-rated restaurants in downtown Chicago'
+   Result: List of restaurants with contact info for delivery partnerships
+
+2. Coffee Shop Discovery:
+   Query: 'Coffee shops near Times Square, New York'
+   Result: Nearby coffee shops with ratings and contact details
+
+3. Business Category Search:
+   Query: 'Retail stores in San Francisco for POS system sales'
+   Result: Retail businesses with contact information for sales outreach
+
+🛠️ TECHNICAL IMPLEMENTATION:
+• Uses Foursquare Places API (free tier)
+• Built with CrewAI framework
+• No AI model dependencies (Exa/Cerebras)
+• Direct API calls for business data
+• Rate-limited for free tier compliance
+
+📊 FREE TIER LIMITS:
+• 1,000 requests per day
+• 60 requests per minute
+• Up to 50 results per search
+• Search radius up to 100km
+
+🔧 SETUP REQUIRED:
+1. Get API key from Foursquare Developer Console
+2. Set FOURSQUARE_API_KEY environment variable
+3. Install dependencies: pip install -r requirements.txt
+
+📁 FILES CREATED:
+• leads_finder/tools/foursquare_search_tools.py - Core search functionality
+• leads_finder/sub_agents/foursquare_agent.py - Main agent implementation
+• leads_finder/config/foursquare_config.py - Configuration management
+• leads_finder/examples/foursquare_example.py - Usage examples
+• leads_finder/README_FOURSQUARE.md - Complete documentation
+
+✅ IMPLEMENTATION STATUS:
+• ✓ Foursquare API integration complete
+• ✓ Agent framework implemented
+• ✓ Error handling and rate limiting
+• ✓ Documentation and examples
+• ✓ Free tier optimization
+
+🚀 READY TO USE!
+The Foursquare Places Agent is fully implemented and ready for lead finding!
