@@ -5,7 +5,7 @@ Direct agent usage for lead finding operations.
 
 from crewai import Agent, Task, Crew, Process
 from ..sub_agents.map_search_agent import create_lead_finder_agent
-from ..tasks.lead_finder_tasks import create_lead_search_task, create_lead_analysis_task
+from ..tasks.map_lead_finder_tasks import create_map_lead_search_task, create_map_lead_analysis_task
 
 
 def search_leads(query: str, location: str, radius: int = 1000, limit: int = 20, use_cost_effective: bool = False):
@@ -26,7 +26,7 @@ def search_leads(query: str, location: str, radius: int = 1000, limit: int = 20,
     agent = create_lead_finder_agent(use_cost_effective=use_cost_effective)
     
     # Create task
-    task = create_lead_search_task(query, location, radius, limit, use_cost_effective)
+    task = create_map_lead_search_task(query, location, radius, limit, use_cost_effective)
     
     # Create and run crew
     crew = Crew(
@@ -56,7 +56,7 @@ def analyze_leads(business_data: str, use_cost_effective: bool = False):
     agent = create_lead_finder_agent(use_cost_effective=use_cost_effective)
     
     # Create task
-    task = create_lead_analysis_task(business_data, use_cost_effective)
+    task = create_map_lead_analysis_task(business_data, use_cost_effective)
     
     # Create and run crew
     crew = Crew(

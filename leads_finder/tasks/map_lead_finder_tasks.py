@@ -1,12 +1,12 @@
 """
-CrewAI Tasks for Lead Finding Workflow.
+CrewAI Tasks for Map-based Lead Finding Workflow.
 """
 
 from crewai import Task
 from ..sub_agents.map_search_agent import create_lead_finder_agent
 
 
-def create_lead_search_task(query: str, location: str, radius: int = 1000, limit: int = 20, use_cost_effective: bool = True) -> Task:
+def create_map_lead_search_task(query: str, location: str, radius: int = 1000, limit: int = 20, use_cost_effective: bool = True) -> Task:
     """
     Create a task for searching business leads.
     
@@ -85,7 +85,7 @@ def create_lead_search_task(query: str, location: str, radius: int = 1000, limit
     )
 
 
-def create_lead_analysis_task(business_data: str, use_cost_effective: bool = True) -> Task:
+def create_map_lead_analysis_task(business_data: str, use_cost_effective: bool = True) -> Task:
     """
     Create a task for analyzing existing business data.
     

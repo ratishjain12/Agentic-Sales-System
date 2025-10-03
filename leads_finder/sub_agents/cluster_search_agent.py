@@ -2,7 +2,7 @@ from typing import Any, Dict
 from crewai import Agent, Task, Crew, Process
 from leads_finder.prompts import CLUSTER_SEARCH_AGENT_PROMPT
 from leads_finder.tools.cluster_search import ClusterSearchTool
-from leads_finder.llm_config import get_crewai_llm
+from config.cerebras_client import get_crewai_llm
 
 def create_cluster_search_agent(city: str) -> Crew:
     print("cluster search agent called!!")
