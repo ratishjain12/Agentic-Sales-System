@@ -93,14 +93,12 @@ agentic-sales-agent/
 │   ├── sub_agents/                 # Individual agents
 │   │   ├── cluster_search_agent.py
 │   │   └── crewai_lead_finder_agent.py
-│   ├── crew/                       # Crew orchestration
-│   │   └── lead_finder_crew.py
+│   ├── simple_lead_finder.py       # Simplified lead finder functions
 │   ├── tasks/                      # Task definitions
 │   │   └── lead_finder_tasks.py
 │   └── tools/                      # External tools
-│       ├── cluster_search.py
-│       ├── foursquare_search.py
-│       └── crewai_foursquare_tool.py
+│       ├── cluster_search.py       # OSM cluster search tool
+│       └── crewai_foursquare_tool.py # Foursquare Places API tool
 ├── sdr/                            # Sales Development Rep module
 └── tests/                          # Test files
     ├── test_configuration.py
@@ -125,24 +123,22 @@ The system supports multiple LLM configurations:
 
 ## 📊 API Reference
 
-### Lead Finder Crew
+### Lead Finder Functions
 
 ```python
-from leads_finder.crew.lead_finder_crew import get_lead_finder_crew
-
-# Get crew instance
-crew = get_lead_finder_crew(use_cost_effective=True)
+from leads_finder.simple_lead_finder import search_leads, analyze_leads
 
 # Search for leads
-result = crew.search_leads(
+result = search_leads(
     query="restaurants",
     location="New York",
     radius=2000,
-    limit=10
+    limit=10,
+    use_cost_effective=False  # Use Cerebras LLM
 )
 
 # Analyze results
-analysis = crew.analyze_leads(str(result))
+analysis = analyze_leads(str(result), use_cost_effective=False)
 ```
 
 ### Cluster Search Agent

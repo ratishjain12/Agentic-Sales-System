@@ -41,5 +41,4 @@ def create_lead_finder_agent(use_cost_effective: bool = True) -> Agent:
     )
 
 
-# Create the agent instance
-lead_finder_agent = create_lead_finder_agent()
+# Agent instances are created on-demand to avoid initialization issues

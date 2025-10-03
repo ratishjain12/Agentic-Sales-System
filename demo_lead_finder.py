@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables
 load_dotenv('env.txt')
 
-from leads_finder.crew.lead_finder_crew import get_lead_finder_crew
+from leads_finder.simple_lead_finder import search_leads, analyze_leads
 
 
 def main():
@@ -33,8 +33,7 @@ def main():
     
     print("API keys configured successfully!")
     
-    # Get the lead finder crew (using Cerebras LLM by default)
-    crew = get_lead_finder_crew(use_cost_effective=False)
+    # Using Cerebras LLM by default
     
     # Demo parameters
     demo_queries = [
@@ -68,7 +67,7 @@ def main():
                 
                 try:
                     # Execute the lead search
-                    result = crew.search_leads(query, location, radius=2000, limit=10)
+                    result = search_leads(query, location, radius=2000, limit=10, use_cost_effective=False)
                     
                     print("\n" + "=" * 50)
                     print("SEARCH RESULTS")
@@ -79,7 +78,7 @@ def main():
                     analyze = input("\nWould you like to analyze these results? (y/n): ").strip().lower()
                     if analyze == 'y':
                         print("\nAnalyzing results...")
-                        analysis_result = crew.analyze_leads(str(result))
+                        analysis_result = analyze_leads(str(result), use_cost_effective=False)
                         
                         print("\n" + "=" * 50)
                         print("ANALYSIS RESULTS")
@@ -117,11 +116,9 @@ def quick_demo():
         return
     
     # Run a quick search using Cerebras LLM (default)
-    crew = get_lead_finder_crew(use_cost_effective=False)
-    
     print("Searching for restaurants in New York...")
     try:
-        result = crew.search_leads("restaurants", "New York", radius=1000, limit=5)
+        result = search_leads("restaurants", "New York", radius=1000, limit=5, use_cost_effective=False)
         print("\nRESULTS:")
         print(result)
     except Exception as e:

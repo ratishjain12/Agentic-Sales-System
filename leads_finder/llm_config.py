@@ -116,9 +116,9 @@ def get_analysis_llm() -> LLM:
     )
 
 def get_cost_effective_llm() -> LLM:
-    """Get OpenAI GPT-4o-mini LLM for cost-effective operations."""
-    return LLMConfig.get_openai_llm(
-        model="gpt-4o-mini",
+    """Get Cerebras llama3.1-8b LLM for cost-effective operations."""
+    return LLMConfig.get_cerebras_llm(
+        model="cerebras/llama3.1-8b",
         temperature=0.3,
         max_completion_tokens=2048
     )

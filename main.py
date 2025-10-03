@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables
 load_dotenv('env.txt')
 
-from leads_finder.crew.lead_finder_crew import get_lead_finder_crew
+from leads_finder.simple_lead_finder import search_leads, analyze_leads
 from leads_finder.sub_agents.cluster_search_agent import run_cluster_search
 
 
@@ -89,14 +89,11 @@ def run_foursquare_search():
         print("Invalid radius or limit. Using defaults.")
         radius, limit = 2000, 10
     
-    # Get the lead finder crew
-    crew = get_lead_finder_crew(use_cost_effective=True)
-    
     print(f"\nSearching for {query} in {location}...")
     print("This may take a few moments...")
     
     try:
-        result = crew.search_leads(query, location, radius=radius, limit=limit)
+        result = search_leads(query, location, radius=radius, limit=limit, use_cost_effective=False)
         
         print("\n" + "=" * 50)
         print("SEARCH RESULTS")
@@ -107,7 +104,7 @@ def run_foursquare_search():
         analyze = input("\nWould you like to analyze these results? (y/n): ").strip().lower()
         if analyze == 'y':
             print("\nAnalyzing results...")
-            analysis_result = crew.analyze_leads(str(result))
+            analysis_result = analyze_leads(str(result), use_cost_effective=False)
             
             print("\n" + "=" * 50)
             print("ANALYSIS RESULTS")
@@ -150,8 +147,7 @@ def run_comprehensive_analysis():
     print("\nComprehensive Lead Analysis")
     print("-" * 30)
     
-    # Get the lead finder crew
-    crew = get_lead_finder_crew(use_cost_effective=False)  # Use Cerebras for analysis
+    # Use Cerebras for analysis
     
     # Demo parameters
     demo_queries = [
@@ -173,10 +169,10 @@ def run_comprehensive_analysis():
             query, location = demo_queries[choice]
             
             print(f"\nSearching for {query} in {location}...")
-            search_result = crew.search_leads(query, location, radius=2000, limit=10)
+            search_result = search_leads(query, location, radius=2000, limit=10, use_cost_effective=False)
             
             print("\nAnalyzing search results...")
-            analysis_result = crew.analyze_leads(str(search_result))
+            analysis_result = analyze_leads(str(search_result), use_cost_effective=False)
             
             print("\n" + "=" * 50)
             print("COMPREHENSIVE ANALYSIS")
