@@ -9,3 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Test files
+test_*
+.DS_Store
+uv.lock
