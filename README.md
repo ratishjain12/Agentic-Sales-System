@@ -33,7 +33,7 @@ cd agentic-sales-agent
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables in `env.txt`:
+3. Set up environment variables in `.env`:
 
 ```
 CEREBRAS_API_KEY=your_cerebras_api_key_here
@@ -83,7 +83,7 @@ agentic-sales-agent/
 ├── pyproject.toml                   # Modern Python packaging
 ├── requirements.txt                  # Dependencies
 ├── .python-version                   # Python version specification
-├── env.txt                          # Environment variables
+├── .env                            # Environment variables
 ├── config/                          # Configuration modules
 │   └── __init__.py
 ├── leads_finder/                    # Core lead finding system

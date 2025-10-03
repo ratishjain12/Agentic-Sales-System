@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables
-load_dotenv('env.txt')
+load_dotenv('.env')
 
 from leads_finder.clients.map_search_service import search_leads, analyze_leads
 from leads_finder.sub_agents.cluster_search_agent import run_cluster_search
@@ -30,7 +30,7 @@ def main():
     
     if missing_keys:
         print(f"Missing required API keys: {', '.join(missing_keys)}")
-        print("Please update your env.txt file with valid API keys.")
+        print("Please update your .env file with valid API keys.")
         return
     
     print("API keys configured successfully!")
