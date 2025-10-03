@@ -1,26 +1,19 @@
+from dotenv import load_dotenv; load_dotenv()
 # src/config/cerebras_client.py
-"""
-Pure Cerebras SDK configuration - NO OpenAI dependencies!
-"""
 from cerebras.cloud.sdk import Cerebras
+from crewai import LLM
 import os
 from typing import Optional
-
 
 class CerebrasConfig:
     """Configuration for Cerebras SDK."""
 
     _client: Optional[Cerebras] = None
-
-    # Cerebras API settings
-    BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.net/v1")
-    API_KEY = os.getenv("CEREBRAS_API_KEY")
-
-    # Available models
-    LLAMA_3_1_8B = "llama3.1-8b"
-    LLAMA_3_1_70B = "llama3.1-70b"
-    LLAMA_3_3_70B = "llama3.3-70b"
-
+    _llm: Optional[LLM] = None
+    
+    # Cerebras API endpoint (OpenAI-compatible). Defaults to public endpoint
+    BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
+    
     @classmethod
     def get_client(cls) -> Cerebras:
         """
@@ -39,40 +32,36 @@ class CerebrasConfig:
         return cls._client
 
     @classmethod
-    def chat_completion(
+    def get_crewai_llm(
         cls,
-        messages: list,
-        model: str = "llama3.3-70b",
-        temperature: float = 0.7,
-        max_tokens: int = 1024,
-        **kwargs
-    ):
+        model: str = "cerebras/llama3.1-70b",
+        temperature: float = 0.5,
+        **kwargs,
+    ) -> LLM:
         """
-        Create a chat completion using Cerebras SDK.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            model: Model name (llama3.1-8b, llama3.1-70b, llama3.3-70b)
-            temperature: Temperature for sampling (0.0-1.0)
-            max_tokens: Maximum tokens to generate
-            **kwargs: Additional arguments for Cerebras API
-
-        Returns:
-            Cerebras chat completion response
+        Get CrewAI's LLM configured for Cerebras via LiteLLM.
+        Mirrors the snippet:
+            LLM(model="cerebras/llama3.1-70b", api_key=..., base_url="https://api.cerebras.ai/v1", ...)
         """
-        client = cls.get_client()
-        return client.chat.completions.create(
-            messages=messages,
+        api_key = os.getenv("CEREBRAS_API_KEY")
+        if not api_key:
+            raise ValueError("CEREBRAS_API_KEY environment variable not set")
+
+        return LLM(
             model=model,
+            api_key=api_key,
+            base_url=cls.BASE_URL,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs
+            **kwargs,
         )
 
     @classmethod
     def reset(cls):
-        """Reset client instance (useful for testing)."""
+        """Reset instances (useful for testing)."""
         cls._client = None
+        cls._llm = None
 
 
 # Convenience functions
@@ -85,28 +74,6 @@ def get_cerebras_client() -> Cerebras:
     """
     return CerebrasConfig.get_client()
 
-
-def cerebras_chat(
-    messages: list,
-    model: str = "llama3.3-70b",
-    temperature: float = 0.7,
-    **kwargs
-):
-    """
-    Create a chat completion using Cerebras SDK.
-
-    Args:
-        messages: List of message dicts
-        model: Model name
-        temperature: Temperature setting
-        **kwargs: Additional arguments
-
-    Returns:
-        Chat completion response
-    """
-    return CerebrasConfig.chat_completion(
-        messages=messages,
-        model=model,
-        temperature=temperature,
-        **kwargs
-    )
+def get_crewai_llm(model: str = "cerebras/llama3.1-70b", **kwargs) -> LLM:
+    """Get CrewAI LLM configured for Cerebras."""
+    return CerebrasConfig.get_crewai_llm(model=model, **kwargs)

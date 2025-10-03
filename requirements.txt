@@ -9,4 +9,3 @@ httpx
 uvicorn
 crewai
 crewai_tools
-# Note: langchain-openai removed - using pure Cerebras SDK only!
