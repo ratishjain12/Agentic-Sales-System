@@ -4,7 +4,7 @@ CrewAI Lead Finder Agent implementation using Cerebras LLM.
 
 from crewai import Agent
 from ..llm_config import COST_EFFECTIVE_LLM, LEAD_FINDER_LLM
-from ..tools.crewai_foursquare_tool import foursquare_search_tool_instance
+from ..tools.map_search import foursquare_search_tool_instance
 from ..prompts import LEAD_FINDER_AGENT_PROMPT
 
 

@@ -4,8 +4,8 @@ Direct agent usage for lead finding operations.
 """
 
 from crewai import Agent, Task, Crew, Process
-from .sub_agents.crewai_lead_finder_agent import create_lead_finder_agent
-from .tasks.lead_finder_tasks import create_lead_search_task, create_lead_analysis_task
+from ..sub_agents.map_search_agent import create_lead_finder_agent
+from ..tasks.lead_finder_tasks import create_lead_search_task, create_lead_analysis_task
 
 
 def search_leads(query: str, location: str, radius: int = 1000, limit: int = 20, use_cost_effective: bool = False):

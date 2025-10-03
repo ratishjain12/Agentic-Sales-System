@@ -88,17 +88,18 @@ agentic-sales-agent/
 │   └── __init__.py
 ├── leads_finder/                    # Core lead finding system
 │   ├── __init__.py
+│   ├── clients/                     # Client-facing service functions
+│   │   └── map_search_service.py    # Main map search service
 │   ├── llm_config.py               # Optimized LLM configuration
 │   ├── prompts.py                  # Agent prompts
 │   ├── sub_agents/                 # Individual agents
 │   │   ├── cluster_search_agent.py
-│   │   └── crewai_lead_finder_agent.py
-│   ├── simple_lead_finder.py       # Simplified lead finder functions
+│   │   └── map_search_agent.py
 │   ├── tasks/                      # Task definitions
 │   │   └── lead_finder_tasks.py
 │   └── tools/                      # External tools
 │       ├── cluster_search.py       # OSM cluster search tool
-│       └── crewai_foursquare_tool.py # Foursquare Places API tool
+│       └── map_search.py           # Map search tool
 ├── sdr/                            # Sales Development Rep module
 └── tests/                          # Test files
     ├── test_configuration.py
@@ -126,7 +127,7 @@ The system supports multiple LLM configurations:
 ### Lead Finder Functions
 
 ```python
-from leads_finder.simple_lead_finder import search_leads, analyze_leads
+from leads_finder.clients.map_search_service import search_leads, analyze_leads
 
 # Search for leads
 result = search_leads(

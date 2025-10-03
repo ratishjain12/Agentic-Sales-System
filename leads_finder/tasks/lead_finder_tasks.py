@@ -3,7 +3,7 @@ CrewAI Tasks for Lead Finding Workflow.
 """
 
 from crewai import Task
-from ..sub_agents.crewai_lead_finder_agent import create_lead_finder_agent
+from ..sub_agents.map_search_agent import create_lead_finder_agent
 
 
 def create_lead_search_task(query: str, location: str, radius: int = 1000, limit: int = 20, use_cost_effective: bool = True) -> Task:
