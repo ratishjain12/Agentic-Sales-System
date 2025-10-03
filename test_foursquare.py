@@ -3,13 +3,14 @@ Simple test for Foursquare Places Agent
 """
 
 import os
+from dotenv import load_dotenv
 from leads_finder.tools.foursquare_search import foursquare_search_tool
+
+# Load environment variables from .env file
+load_dotenv()
 
 def test_foursquare():
     """Test the Foursquare search tool."""
-    
-    # Set API key
-    os.environ["FOURSQUARE_API_KEY"] = "EPSMWD4RIUS0PDEPHYXZ1IIM0MN3O2IOI5XKCBH4KTYCDLBW"
     
     print("🔍 Testing Foursquare Places API")
     print("=" * 40)
