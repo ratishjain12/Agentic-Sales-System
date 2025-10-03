@@ -133,27 +133,37 @@ def _foursquare_search_safe(
 
 
 def _get_coordinates(location: str) -> Optional[tuple]:
-    """Get coordinates for common locations."""
-    coordinates_map = {
-        "new york": (40.7128, -74.0060),
-        "new york, ny": (40.7128, -74.0060),
-        "nyc": (40.7128, -74.0060),
-        "san francisco": (37.7749, -122.4194),
-        "san francisco, ca": (37.7749, -122.4194),
-        "chicago": (41.8781, -87.6298),
-        "chicago, il": (41.8781, -87.6298),
-        "ahmedabad": (23.0225, 72.5714),
-        "ahmedabad, gujarat": (23.0225, 72.5714),
-        "bangalore": (12.9716, 77.5946),
-        "bangalore, karnataka": (12.9716, 77.5946),
-        "mumbai": (19.0760, 72.8777),
-        "mumbai, maharashtra": (19.0760, 72.8777),
-        "delhi": (28.7041, 77.1025),
-        "delhi, india": (28.7041, 77.1025)
-    }
+    """Get coordinates for any location using Nominatim API (dynamic geocoding only)."""
+    geo_result = _geocode_city_dynamic(location)
+    if geo_result:
+        return (geo_result["lat"], geo_result["lon"])
     
-    location_lower = location.lower().strip()
-    return coordinates_map.get(location_lower)
+    print(f"Could not find coordinates for location: {location}")
+    return None
+
+
+def _geocode_city_dynamic(city: str) -> Optional[Dict[str, float]]:
+    """
+    Get coordinates for any city using Nominatim OpenStreetMap API.
+    This is the same approach used in cluster_search.py for dynamic geocoding.
+    """
+    USER_AGENT = "sales-agent/1.0 (contact: you@example.com)"
+    
+    try:
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": city, "format": "json", "limit": 1, "addressdetails": 0},
+            headers={"User-Agent": USER_AGENT},
+            timeout=15,
+        )
+        r.raise_for_status()
+        data = r.json()
+        if not data:
+            return None
+        return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"])}
+    except Exception as e:
+        print(f"Dynamic geocoding failed for '{city}': {e}")
+        return None
 
 
 def _format_address(location_data: Dict[str, Any]) -> str:
