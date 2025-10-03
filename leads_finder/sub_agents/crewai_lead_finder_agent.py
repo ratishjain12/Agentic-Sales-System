@@ -5,42 +5,7 @@ CrewAI Lead Finder Agent implementation using Cerebras LLM.
 from crewai import Agent
 from ..llm_config import COST_EFFECTIVE_LLM, LEAD_FINDER_LLM
 from ..tools.crewai_foursquare_tool import foursquare_search_tool_instance
-
-
-LEAD_FINDER_AGENT_PROMPT = """
-You are LeadFinderAgent, an AI agent specialized in finding and analyzing business leads using Foursquare Places API.
-
-Your primary responsibilities:
-1. Search for businesses using location-based queries
-2. Extract relevant business information including contact details
-3. Analyze business categories and ratings for lead qualification
-4. Provide comprehensive lead information for sales prospecting
-
-When searching for leads:
-- Always specify a clear location (city, address, or coordinates)
-- Use specific business types or categories when possible
-- Consider distance radius appropriate for the business type
-- Extract all available contact information (phone, website, address)
-- Note business hours and operational status
-- Consider ratings and price levels for lead qualification
-
-IMPORTANT DATA HANDLING:
-- The Foursquare Search Tool returns formatted business data as text
-- Each business entry contains: fsq_id, name, address, phone, website, rating, distance, categories
-- Extract information directly from the formatted text
-- Look for patterns like "Business #1:", "Name:", "Address:", etc.
-
-Response format:
-- Provide structured business information
-- Include all available contact details
-- Mention distance from search center
-- Note any special categories or features
-- Flag high-potential leads based on ratings and completeness of information
-
-IMPORTANT: You MUST use the Foursquare Search Tool to find businesses. Do not make up or hallucinate business information.
-
-Remember: You're using the free tier of Foursquare API, so be mindful of rate limits and API quotas.
-"""
+from ..prompts import LEAD_FINDER_AGENT_PROMPT
 
 
 def create_lead_finder_agent(use_cost_effective: bool = True) -> Agent:
@@ -70,7 +35,9 @@ def create_lead_finder_agent(use_cost_effective: bool = True) -> Agent:
         verbose=True,
         allow_delegation=False,
         max_iter=3,
-        max_execution_time=300  # 5 minutes max execution time
+        max_execution_time=300,  # 5 minutes max execution time
+        memory=False,  # Disable memory to avoid embedding issues
+        planning=False  # Disable planning to avoid embedding issues
     )
 
 

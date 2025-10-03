@@ -1,5 +1,5 @@
 """
-Demo script for CrewAI Lead Finder with Cerebras LLM.
+Demo script for Agentic Sales Agent Lead Finder.
 """
 
 import os
@@ -17,10 +17,10 @@ from leads_finder.crew.lead_finder_crew import get_lead_finder_crew
 
 def main():
     """Main demo function."""
-    print("CrewAI Lead Finder Demo - Cost-Effective Edition")
-    print("=" * 55)
-    print("Using GPT-5-nano (OpenAI) + Cerebras llama3.1-8b for optimal cost/performance")
-    print("=" * 55)
+    print("Agentic Sales Agent - Lead Finder Demo")
+    print("=" * 50)
+    print("AI-powered lead generation with multiple LLM providers")
+    print("=" * 50)
     
     # Check if required API keys are set
     required_keys = ["FOURSQUARE_API_KEY", "OPENAI_API_KEY"]
@@ -104,8 +104,8 @@ def main():
 
 def quick_demo():
     """Quick demo without user interaction."""
-    print("Quick CrewAI Lead Finder Demo - Cost-Effective Edition")
-    print("=" * 50)
+    print("Quick Agentic Sales Agent Demo")
+    print("=" * 40)
     
     # Check API keys
     if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
@@ -116,7 +116,7 @@ def quick_demo():
         print("Please set FOURSQUARE_API_KEY in env.txt")
         return
     
-    # Run a quick search using Cerebras LLM (to avoid OpenAI quota issues)
+    # Run a quick search using Cerebras LLM (default)
     crew = get_lead_finder_crew(use_cost_effective=False)
     
     print("Searching for restaurants in New York...")
