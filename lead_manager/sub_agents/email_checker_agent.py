@@ -38,12 +38,50 @@ def create_email_checker_agent() -> Crew:
 
 
 def run_email_checker():
-    crew = create_email_checker_agent()
-    result = crew.kickoff()
-    for attr in ("raw", "output"):
-        if hasattr(result, attr):
-            return getattr(result, attr)
+    """Run email checker agent and return structured results."""
+    import json
     try:
-        return result.to_dict()
-    except Exception:
-        return str(result)
+        crew = create_email_checker_agent()
+        result = crew.kickoff()
+        
+        # Try to extract structured data from different result formats
+        if hasattr(result, 'raw'):
+            raw_result = result.raw
+            if isinstance(raw_result, str):
+                try:
+                    # Try to parse JSON from string
+                    parsed_result = json.loads(raw_result)
+                    return {"success": True, "result": parsed_result}
+                except json.JSONDecodeError:
+                    return {"success": False, "error": "Failed to parse email data", "raw": raw_result}
+            elif isinstance(raw_result, dict):
+                return {"success": True, "result": raw_result}
+            else:
+                return {"success": True, "result": raw_result}
+        
+        elif hasattr(result, 'output'):
+            output_result = result.output
+            if isinstance(output_result, str):
+                try:
+                    parsed_result = json.loads(output_result)
+                    return {"success": True, "result": parsed_result}
+                except json.JSONDecodeError:
+                    return {"success": False, "error": "Failed to parse email data", "raw": output_result}
+            elif isinstance(output_result, dict):
+                return {"success": True, "result": output_result}
+            else:
+                return {"success": True, "result": output_result}
+        
+        elif hasattr(result, 'to_dict'):
+            return {"success": True, "result": result.to_dict()}
+            
+        # If all else fails, try to convert to string and parse
+        string_result = str(result)
+        try:
+            parsed_result = json.loads(string_result)
+            return {"success": True, "result": parsed_result}
+        except json.JSONDecodeError:
+            return {"success": False, "error": "Failed to parse email data", "raw": string_result}
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}

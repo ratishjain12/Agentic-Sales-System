@@ -301,7 +301,7 @@ def _get_unread_emails_from_gmail():
         results = service.users().messages().list(
             userId='me',
             q='is:unread',
-            maxResults=10
+            maxResults=1
         ).execute()
         
         messages = results.get('messages', [])

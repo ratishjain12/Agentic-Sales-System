@@ -12,7 +12,7 @@ class LLMConfig:
     """Centralized LLM configuration manager."""
     
     # Cerebras API endpoint (OpenAI-compatible)
-    CEREBRAS_BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
+    CEREBRAS_BASE_URL = os.getenv("CEREBRAS_BASE_URL")
     OPENAI_BASE_URL = "https://api.openai.com/v1"
     
     @classmethod
@@ -40,7 +40,7 @@ class LLMConfig:
         return LLM(
             model=model,
             api_key=api_key,
-            base_url=cls.CEREBRAS_BASE_URL,
+            base_url="https://api.cerebras.ai/v1",
             temperature=temperature,
             top_p=kwargs.get("top_p", 1),
             max_completion_tokens=kwargs.get("max_completion_tokens", 8192),
