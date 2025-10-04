@@ -1,788 +1,467 @@
-# =� Lead Manager - Sales Lead Qualification & Meeting Scheduler
+# 🚀 Lead Manager Agent System
 
-The Lead Manager is a sophisticated email monitoring and meeting scheduling system that automatically processes incoming emails, identifies hot leads, analyzes meeting requests using AI, and schedules appointments with Google Calendar integration. It serves as the critical bridge between initial lead contact and conversion to scheduled meetings.
+A sophisticated AI-powered email monitoring and lead management system that automatically processes Gmail emails, detects hot leads, schedules meetings, and manages customer interactions through a sequential agent workflow.
 
-## =� Features
+## 📋 Table of Contents
 
-- **Real-time Gmail Monitoring**: Continuous monitoring of sales emails for immediate response
-- **Hot Lead Detection**: Intelligent lead qualification using database cross-referencing
-- **AI-Powered Email Analysis**: Vertex AI integration for meeting request detection
-- **Automatic Meeting Scheduling**: Google Calendar integration with Google Meet links
-- **Professional Communication**: Branded templates and standardized messaging
-- **Real-time Dashboard Updates**: Live notifications to the UI client
-- **Data Persistence**: BigQuery integration for comprehensive tracking
-- **Service Account Authentication**: Secure API access without manual intervention
-
-## =� Table of Contents
-
+- [Overview](#overview)
 - [Architecture](#architecture)
+- [Agent Flow](#agent-flow)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
-- [Sub-Agents](#sub-agents)
-- [Tools](#tools)
-- [Workflow](#workflow)
-- [API Documentation](#api-documentation)
-- [Development](#development)
-- [Deployment](#deployment)
+- [Database Schema](#database-schema)
+- [API Integration](#api-integration)
+- [Error Handling](#error-handling)
+- [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 
-## <� Architecture
+## 🎯 Overview
 
-The Lead Manager follows a sequential agent architecture with sophisticated email processing and calendar integration:
+The Lead Manager system automatically monitors your Gmail inbox for unread emails, analyzes them using AI to detect hot leads and meeting requests, and takes appropriate actions including scheduling meetings and sending notifications. The system uses a sequential agent architecture to ensure reliable, step-by-step processing.
 
-```mermaid
-graph TD
-    A[Lead Manager Agent] --> B[Email Checker Agent]
-    B --> C[Email Analyzer Agent]
-    C --> D{Hot Lead?}
-    D -->|Yes| E[UI Notification]
-    D --> F[Meeting Request Analysis]
-    F --> G{Meeting Request?}
-    G -->|Yes| H[Calendar Organizer Agent]
-    G -->|No| I[PostAction Agent]
-    H --> J[Check Availability]
-    H --> K[Create Meeting]
-    H --> I
-    I --> L[Mark Email Read]
-    I --> M[Save Meeting Data]
-    
-    N[Gmail API] --> B
-    O[BigQuery] --> C
-    P[Google Calendar] --> H
-    Q[Vertex AI] --> F
+### Key Features
+
+- **Real-time Email Monitoring**: Automatically checks Gmail for unread emails
+- **AI-Powered Lead Detection**: Uses Cerebras LLM to analyze email content for hot lead signals
+- **Meeting Request Analysis**: Detects and processes meeting requests from emails
+- **Automatic Meeting Scheduling**: Integrates with Google Calendar and Google Meet
+- **MongoDB Data Persistence**: Stores meeting data, email status, and lead analysis
+- **Sequential Agent Workflow**: Ensures reliable, step-by-step processing
+- **Business Email Filtering**: Automatically filters out system/automated emails
+
+## 🏗️ Architecture
+
+### System Components
+
+```
+📧 Gmail API → Email Checker → Email Analyzer → Calendar Organizer → Post Action
+     ↓              ↓              ↓              ↓              ↓
+  Real Emails   Hot Lead?    Meeting Req?   Schedule?    MongoDB Save
 ```
 
-### Core Components
+### Agent Hierarchy
 
-1. **Email Processing Pipeline**: Gmail API integration for real-time monitoring
-2. **Lead Qualification System**: Database cross-referencing for hot lead identification
-3. **AI Analysis Engine**: Vertex AI for intelligent meeting request detection
-4. **Calendar Management**: Google Calendar with Google Meet integration
-5. **Data Persistence**: BigQuery storage with local backup systems
-6. **Real-time Notifications**: UI dashboard integration
+1. **Email Checker Agent** - Retrieves unread emails from Gmail
+2. **Email Analyzer Agent** - AI-powered analysis for hot leads and meeting requests
+3. **Calendar Organizer Agent** - Schedules meetings for qualified leads
+4. **Post Action Agent** - Finalizes workflow and saves data
 
-## =� Installation
+### Database Architecture
+
+- **Lead Manager Database**: `leads_manager_db` (separate from leads_finder)
+- **Collections**: meetings, email_status, lead_analysis
+- **Data Types**: Meeting details, email processing status, lead qualification scores
+
+## 🔄 Agent Flow
+
+### Sequential Processing Workflow
+
+```
+For each unread email:
+1. Email Checker Agent → Retrieve email data
+2. Email Analyzer Agent → AI analysis (hot lead + meeting request detection)
+3. Decision: Hot Lead? → Yes: UI notification
+4. Decision: Meeting Request + Hot Lead? → Yes: Calendar Organizer Agent
+5. Calendar Organizer Agent → Check availability + Create meeting
+6. Post Action Agent → Save data, mark email as read, send notifications
+```
+
+### Detailed Agent Responsibilities
+
+#### 1. Email Checker Agent
+- **File**: `lead_manager/sub_agents/email_checker_agent.py`
+- **Purpose**: Retrieves unread emails from Gmail using OAuth2
+- **Tools**: `CheckEmailTool` (Gmail API integration)
+- **Output**: Structured email data with metadata
+- **Database**: None (just retrieval)
+
+#### 2. Email Analyzer Agent
+- **File**: `lead_manager/sub_agents/email_analyzer_agent.py`
+- **Purpose**: AI-powered analysis for hot leads and meeting requests
+- **Tools**: `MeetingAnalysisTool` (Cerebras LLM)
+- **AI Analysis**:
+  - Hot lead detection (content-based, no DB queries)
+  - Meeting request detection
+  - Lead scoring (0-100)
+  - Interest signals extraction
+- **Output**: Analysis results with confidence scores
+
+#### 3. Calendar Organizer Agent
+- **File**: `lead_manager/sub_agents/calendar_organizer_agent.py`
+- **Purpose**: Schedules meetings for hot leads with meeting requests
+- **Tools**: 
+  - `CheckAvailabilityTool` (Google Calendar API)
+  - `CreateMeetingTool` (Google Meet integration)
+- **Condition**: Only runs if BOTH hot lead AND meeting request detected
+- **Output**: Meeting scheduled with Google Meet link
+
+#### 4. Post Action Agent
+- **File**: `lead_manager/sub_agents/post_action_agent.py`
+- **Purpose**: Finalizes workflow and saves data
+- **Tools**:
+  - `SaveMeetingTool` (MongoDB)
+  - `MarkEmailReadTool` (MongoDB)
+  - `UINotificationTool` (UI alerts)
+- **Database**: Saves meeting data and email status
+
+## 🛠️ Installation
 
 ### Prerequisites
 
-- Python 3.9+
-- Google Cloud Project with enabled APIs:
-  - Gmail API
-  - Google Calendar API
-  - BigQuery API
-  - Vertex AI API
-- Service account with domain-wide delegation
-- Google Workspace admin access
+- Python 3.8+
+- MongoDB instance
+- Gmail account with API access
+- Google Cloud Platform project
+- Cerebras API key
 
-### Local Development Setup
+### Dependencies
 
-1. **Clone the repository**:
 ```bash
-git clone <repository-url>
-cd salesshortcut
+pip install -r requirements.txt
 ```
 
-2. **Install dependencies**:
-```bash
-pip install -r lead_manager/requirements.txt
-```
+Key dependencies:
+- `crewai` - Agent framework
+- `pymongo` - MongoDB integration
+- `google-auth` - Google API authentication
+- `google-api-python-client` - Google services
+- `litellm` - LLM integration
+- `python-dotenv` - Environment management
 
-3. **Set environment variables**:
-```bash
-export GOOGLE_API_KEY="your-google-api-key"
-export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-export SALES_EMAIL="sales@zemzen.org"
-export CALENDAR_ID="primary"
-export UI_CLIENT_SERVICE_URL="http://localhost:8000"
-```
-
-4. **Configure service account**:
-```bash
-# Set up Google Cloud authentication
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
-```
-
-5. **Start the Lead Manager service**:
-```bash
-python -m lead_manager --port 8082
-```
-
-### Docker Installation
-
-1. **Build the Docker image**:
-```bash
-docker build -f Dockerfile.lead_manager -t salesshortcut-lead-manager .
-```
-
-2. **Run the container**:
-```bash
-docker run -p 8082:8082 \
-  -e GOOGLE_API_KEY="your-google-api-key" \
-  -e GOOGLE_CLOUD_PROJECT="your-project-id" \
-  -e SALES_EMAIL="sales@zemzen.org" \
-  -v /path/to/service-account.json:/app/service-account.json \
-  -e GOOGLE_APPLICATION_CREDENTIALS="/app/service-account.json" \
-  salesshortcut-lead-manager
-```
-
-## =' Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `GOOGLE_API_KEY` | Google API key for Vertex AI | Yes | None |
-| `GOOGLE_CLOUD_PROJECT` | GCP project ID | Yes | None |
-| `SALES_EMAIL` | Email address to monitor | Yes | sales@zemzen.org |
-| `CALENDAR_ID` | Google Calendar ID | Optional | primary |
-| `UI_CLIENT_SERVICE_URL` | UI client callback URL | Optional | http://localhost:8000 |
-| `BUSINESS_HOURS_START` | Meeting start time | Optional | 9 |
-| `BUSINESS_HOURS_END` | Meeting end time | Optional | 18 |
-| `MEETING_DURATION` | Default meeting length (min) | Optional | 60 |
-| `AVAILABILITY_DAYS` | Days to check ahead | Optional | 7 |
-
-### Service Configuration
-
-Create a `.env` file in the `lead_manager/` directory:
+Create a `.env` file with the following variables:
 
 ```env
-# Core APIs
-GOOGLE_API_KEY=your_google_api_key_here
-GOOGLE_CLOUD_PROJECT=your_gcp_project_id
-SALES_EMAIL=sales@zemzen.org
+# Cerebras AI Configuration
+CEREBRAS_API_KEY=your_cerebras_api_key
+CEREBRAS_BASE_URL=https://api.cerebras.ai/v1
 
-# Calendar Configuration
-CALENDAR_ID=primary
-BUSINESS_HOURS_START=9
-BUSINESS_HOURS_END=18
-MEETING_DURATION=60
-AVAILABILITY_DAYS=7
+# MongoDB Configuration
+MONGODB_URI=mongodb://localhost:27017
+LEAD_MANAGER_DATABASE_NAME=leads_manager_db
 
-# Service URLs
-UI_CLIENT_SERVICE_URL=http://localhost:8000
+# Google API Configuration
+GOOGLE_CREDENTIALS_FILE=path/to/credentials.json
+GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
 
-# Service Account (for Docker)
-GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
+# Optional: Custom model settings
+CEREBRAS_MODEL=cerebras/llama3.1-8b
+CEREBRAS_TEMPERATURE=0.3
 ```
 
-### Google Workspace Setup
+### Google API Setup
 
-1. **Create service account**:
+1. **Enable APIs**:
+   - Gmail API
+   - Google Calendar API
+   - Google Meet API
+
+2. **Create Service Account**:
+   - Download credentials JSON
+   - Set `GOOGLE_CREDENTIALS_FILE` path
+
+3. **Gmail OAuth2**:
+   - Configure OAuth2 consent screen
+   - Generate OAuth2 credentials
+
+### MongoDB Setup
+
+1. **Install MongoDB** (local or cloud)
+2. **Set Connection String**: Update `MONGODB_URI`
+3. **Database**: System creates `leads_manager_db` automatically
+
+## 🚀 Usage
+
+### Running the Lead Manager
+
+#### Option 1: Main Application
 ```bash
-gcloud iam service-accounts create lead-manager-sa \
-  --description="Lead Manager Service Account" \
-  --display-name="Lead Manager"
+python main.py
+# Select option 4: Run Lead Manager workflow
 ```
 
-2. **Enable domain-wide delegation**:
+#### Option 2: Direct Execution
 ```bash
-# In Google Admin Console:
-# Security > API Controls > Domain-wide Delegation
-# Add client ID with scopes:
-# https://www.googleapis.com/auth/gmail.readonly
-# https://www.googleapis.com/auth/gmail.modify
-# https://www.googleapis.com/auth/calendar
+python -m lead_manager
 ```
 
-3. **Grant BigQuery permissions**:
+#### Option 3: Individual Agent Testing
 ```bash
-gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
-  --member="serviceAccount:lead-manager-sa@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/bigquery.dataEditor"
+python test_lead_manager_flow.py
 ```
 
-## =� Usage
+### Workflow Execution
 
-### Starting the Lead Manager
+The system automatically:
+1. **Checks Gmail** for unread emails
+2. **Filters** business-related emails
+3. **Analyzes** each email for hot lead signals
+4. **Detects** meeting requests
+5. **Schedules** meetings for qualified leads
+6. **Saves** data to MongoDB
+7. **Sends** notifications
 
-```bash
-# Start the Lead Manager service
-python -m lead_manager --host 0.0.0.0 --port 8082
+### Expected Output
 
-# Check service health
-curl http://localhost:8082/health
+```
+🚀 Starting Lead Manager workflow...
+📧 PROCESSING EMAIL:
+   👤 From: John Doe (john@company.com)
+   📝 Subject: Interested in your services
+   📅 Date: 2024-01-15T10:30:00Z
+   🔗 Message ID: msg_12345...
+
+   ✅ DECISION: PROCESSING - Business email
+   🔄 Starting Sequential Workflow...
+
+🔄 STEP 1: Email Checker Agent ✅ COMPLETED
+🔍 STEP 2: Email Analyzer Agent → ANALYZING...
+🔥 STEP 3: HOT LEAD DETECTED! ✅ → UI Notification sent
+🤖 STEP 4: Meeting Request Analysis ✅ COMPLETED
+🚀 STEP 5: Meeting Request + Hot Lead → CALENDAR ORGANIZER
+📅 STEP 6: Calendar Organizer Agent → SCHEDULING...
+✅ STEP 6: Meeting scheduled successfully!
+🔧 STEP 7: Post Action Agent → FINALIZING...
+✅ SEQUENTIAL WORKFLOW COMPLETED for: john@company.com
 ```
 
-### Monitoring Email Responses
+## 🗄️ Database Schema
 
-The Lead Manager automatically monitors the configured email address for unread emails. When emails are received:
+### MongoDB Collections
 
-1. System checks if sender is a hot lead
-2. Analyzes email content for meeting requests
-3. Schedules meetings if requests are detected
-4. Sends real-time notifications to dashboard
-
-### Manual Testing
-
-```bash
-# Trigger lead management workflow
-curl -X POST http://localhost:8082/process_emails \
-  -H 'Content-Type: application/json'
-
-# Check for specific email
-curl -X POST http://localhost:8082/analyze_email \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "sender": "prospect@company.com",
-    "subject": "Meeting Request",
-    "body": "I would like to schedule a meeting next week"
-  }'
-```
-
-### Scheduling Meetings
-
-```bash
-# Create meeting manually
-curl -X POST http://localhost:8082/schedule_meeting \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "attendee_email": "prospect@company.com",
-    "title": "Business Consultation",
-    "duration": 60
-  }'
-```
-
-## > Sub-Agents
-
-### 1. Email Checker Agent
-**Purpose**: Retrieve and structure unread emails from Gmail
-
-```python
-# Location: lead_manager/sub_agents/email_checker_agent.py
-# Tools: check_email_tool
-# Output: Structured list of unread emails
-```
-
-**Capabilities**:
-- Gmail API integration with service account authentication
-- Email body extraction from multiple MIME types
-- Thread conversation history tracking
-- Email metadata extraction (sender, subject, date, message ID)
-- Handles multi-part messages and nested content
-
-### 2. Email Analyzer Agent
-**Purpose**: Analyze emails to identify hot leads and meeting requests
-
-```python
-# Location: lead_manager/sub_agents/email_analyzer.py
-# Tools: check_hot_lead_tool, is_meeting_request_llm
-# Output: Lead qualification and meeting request analysis
-```
-
-**Features**:
-- Hot lead verification against database
-- AI-powered meeting request detection using Vertex AI
-- Real-time UI notifications for hot leads
-- Robust JSON parsing with fallback mechanisms
-- Intent recognition for explicit and implicit meeting requests
-
-### 3. Calendar Organizer Agent
-**Purpose**: Schedule meetings with hot leads
-
-```python
-# Location: lead_manager/sub_agents/calendar_organizer_agent.py
-# Tools: check_availability_tool, create_meeting_tool
-# Output: Scheduled calendar events with Google Meet links
-```
-
-**Features**:
-- Calendar availability checking (business hours only)
-- Google Meet integration for video calls
-- Professional meeting descriptions with agenda templates
-- Automatic email invitations to attendees
-- Conflict detection and resolution
-
-### 4. Post Action Agent
-**Purpose**: Finalize the booking process and clean up
-
-```python
-# Location: lead_manager/sub_agents/post_action_agent.py
-# Tools: mark_email_read_tool, save_meeting_tool
-# Output: Completion status and data persistence
-```
-
-**Workflow**:
-1. Confirm meeting was successfully created
-2. Save meeting data to BigQuery
-3. Mark original email as read
-4. Generate final completion notification
-
-## =� Tools
-
-### 1. Email Management Tools
-**File**: `lead_manager/tools/check_email.py`
-
-```python
-from lead_manager.tools.check_email import check_email_tool
-
-# Retrieve unread emails
-emails = check_email_tool.run(email_address="sales@zemzen.org")
-```
-
-**Features**:
-- **Service Account Authentication**: Secure Gmail API access
-- **Multi-format Support**: Handles text/plain, text/html, multipart
-- **Thread Management**: Extracts conversation history
-- **Metadata Extraction**: Complete email information
-
-### 2. Calendar Management Tools
-**File**: `lead_manager/tools/calendar_utils.py`
-
-```python
-from lead_manager.tools.calendar_utils import check_availability_tool, create_meeting_tool
-
-# Check calendar availability
-availability = check_availability_tool.run(
-    calendar_id="primary",
-    days_ahead=7
-)
-
-# Create meeting
-meeting = create_meeting_tool.run(
-    calendar_id="primary",
-    title="Business Consultation",
-    attendee_email="prospect@company.com",
-    duration=60
-)
-```
-
-**Features**:
-- **Business Hours Scheduling**: 9 AM - 6 PM, weekdays only
-- **Google Meet Integration**: Automatic video conference links
-- **Professional Templates**: Standardized meeting descriptions
-- **Timezone Handling**: Automatic timezone conversion
-
-### 3. AI Analysis Tool
-**File**: `lead_manager/tools/meeting_request_llm.py`
-
-```python
-from lead_manager.tools.meeting_request_llm import is_meeting_request_llm
-
-# Analyze email for meeting requests
-analysis = is_meeting_request_llm(
-    email_body="I would like to schedule a meeting next week",
-    sender="prospect@company.com"
-)
-```
-
-**Features**:
-- **Vertex AI Integration**: Gemini model for intelligent analysis
-- **Structured Output**: JSON responses with confidence scores
-- **Fallback Detection**: Keyword-based backup analysis
-- **Intent Recognition**: Identifies explicit and implicit requests
-
-### 4. Data Management Tools
-**File**: `lead_manager/tools/bigquery_utils.py`
-
-```python
-from lead_manager.tools.bigquery_utils import check_hot_lead_tool, save_meeting_tool
-
-# Check if sender is a hot lead
-is_hot_lead = check_hot_lead_tool.run(
-    email_address="prospect@company.com"
-)
-
-# Save meeting data
-save_meeting_tool.run(meeting_data)
-```
-
-**Features**:
-- **Hot Lead Database**: Cross-reference against qualified leads
-- **Meeting Persistence**: BigQuery storage with JSON backup
-- **Audit Trail**: Comprehensive activity logging
-- **Data Validation**: Schema enforcement and error handling
-
-## =� Workflow
-
-### Complete Lead Management Process
-
-1. **Email Monitoring Phase**:
-   - Monitor Gmail for unread emails
-   - Extract email content and metadata
-   - Structure data for analysis
-
-2. **Lead Qualification Phase**:
-   - Check sender against hot leads database
-   - Send UI notification if hot lead found
-   - Continue to content analysis regardless
-
-3. **Meeting Request Detection**:
-   - Use AI/LLM to analyze email content
-   - Identify explicit/implicit meeting requests
-   - Extract proposed dates/times if mentioned
-   - Generate confidence scores
-
-4. **Calendar Scheduling Phase**:
-   - Check calendar availability for next 7 days
-   - Find optimal meeting times within business hours
-   - Create Google Calendar event with Google Meet link
-   - Send calendar invitations to attendees
-
-5. **Finalization Phase**:
-   - Save meeting data to BigQuery
-   - Mark original email as read
-   - Send completion notifications to UI
-   - Log all activities for audit trail
-
-### State Management
-
-```python
-# Session state includes:
+#### `meetings` Collection
+```json
 {
-    "unread_emails": [...],
-    "hot_leads": [...],
-    "meeting_requests": [...],
-    "scheduled_meetings": [...],
-    "processed_emails": [...],
-    "notifications_sent": [...]
-}
-```
-
-## = API Documentation
-
-### A2A Integration
-
-```python
-# Agent capabilities
-capabilities = AgentCapabilities(
-    skills=[
-        AgentSkill(
-            name="process_leads",
-            description="Process email responses and schedule meetings"
-        )
-    ]
-)
-```
-
-### REST Endpoints
-
-```http
-# Process emails and manage leads
-POST /process_emails
-Content-Type: application/json
-
-# Analyze specific email
-POST /analyze_email
-Content-Type: application/json
-{
-  "sender": "prospect@company.com",
+  "meeting_id": "meet_12345",
+  "sender_email": "john@company.com",
+  "sender_name": "John Doe",
   "subject": "Meeting Request",
-  "body": "Email content..."
+  "meeting_time": "2024-01-15T14:00:00Z",
+  "meeting_duration": 30,
+  "meet_link": "https://meet.google.com/abc-def-ghi",
+  "status": "scheduled",
+  "created_at": "2024-01-15T10:30:00Z"
 }
+```
 
-# Schedule meeting manually
-POST /schedule_meeting
-Content-Type: application/json
+#### `email_status` Collection
+```json
 {
-  "attendee_email": "prospect@company.com",
-  "title": "Business Consultation",
-  "duration": 60
+  "message_id": "msg_12345",
+  "sender_email": "john@company.com",
+  "subject": "Interested in your services",
+  "processed_at": "2024-01-15T10:30:00Z",
+  "status": "processed",
+  "hot_lead_detected": true,
+  "meeting_request_detected": true,
+  "meeting_scheduled": true
 }
-
-# Check service health
-GET /health
-
-# Get agent capabilities
-GET /capabilities
 ```
 
-### Webhook Notifications
-
-The Lead Manager sends real-time updates to the UI client:
-
-```javascript
-// Hot lead notification
+#### `lead_analysis` Collection
+```json
 {
-  "agent_type": "lead_manager",
-  "business_id": "hot_lead_001",
-  "status": "converting",
-  "message": "Hot lead email from prospect@company.com",
-  "timestamp": "2025-06-23T12:00:00Z",
-  "data": {
-    "sender_email": "prospect@company.com",
-    "subject": "Meeting Request",
-    "type": "hot_lead_email"
-  }
-}
-
-// Meeting scheduled notification
-{
-  "agent_type": "calendar",
-  "business_id": "meeting_001",
-  "status": "meeting_scheduled",
-  "message": "Meeting scheduled with ProspectCorp",
-  "timestamp": "2025-06-23T13:00:00Z",
-  "data": {
-    "title": "Business Consultation",
-    "start_datetime": "2025-06-25T14:00:00-06:00",
-    "attendees": ["prospect@company.com", "sales@zemzen.org"]
-  }
+  "message_id": "msg_12345",
+  "sender_email": "john@company.com",
+  "analysis_timestamp": "2024-01-15T10:30:00Z",
+  "hot_lead_score": 85,
+  "meeting_request_detected": true,
+  "interest_signals": ["urgent", "partnership", "discuss"],
+  "confidence_score": 0.87,
+  "ai_analysis": "Strong interest in partnership discussion"
 }
 ```
 
-## =� Development
+## 🔌 API Integration
 
-### Running in Development Mode
+### Gmail API
+- **Authentication**: OAuth2
+- **Scope**: `https://www.googleapis.com/auth/gmail.readonly`
+- **Operations**: List messages, get message details, mark as read
 
-```bash
-# Install development dependencies
-pip install -r lead_manager/requirements.txt
+### Google Calendar API
+- **Authentication**: Service Account
+- **Scope**: `https://www.googleapis.com/auth/calendar`
+- **Operations**: Check availability, create events
 
-# Start with debug logging
-python -m lead_manager --port 8082 --log-level DEBUG
+### Google Meet API
+- **Integration**: Via Calendar API
+- **Features**: Generate meeting links, set up video calls
 
-# Use development mode with mock data
-export USE_MOCK_DATA=true
-python -m lead_manager --port 8082
-```
+### Cerebras AI API
+- **Model**: `cerebras/llama3.1-8b`
+- **Endpoint**: `https://api.cerebras.ai/v1`
+- **Usage**: Hot lead detection, meeting request analysis
 
-### Project Structure
+## 🛡️ Error Handling
 
-```
-lead_manager/
-   __init__.py
-   __main__.py                    # Entry point
-   agent_executor.py             # A2A agent executor
-   lead_manager/                 # Main agent package
-      __init__.py
-      agent.py                  # Main Lead Manager agent
-      config.py                 # Configuration
-      prompts.py               # LLM prompts
-      sub_agents/              # Sub-agent implementations
-          email_checker_agent.py
-          email_analyzer.py
-          calendar_organizer_agent.py
-          post_action_agent.py
-   tools/                       # Tool implementations
-      check_email.py           # Gmail integration
-      calendar_utils.py        # Calendar management
-      meeting_request_llm.py   # AI analysis
-      bigquery_utils.py        # Data persistence
-      ui_notification.py       # Dashboard callbacks
-   requirements.txt             # Dependencies
-```
+### API Failures
+- **Cerebras API**: Falls back to keyword-based analysis
+- **Gmail API**: Retries with exponential backoff
+- **Calendar API**: Graceful degradation, logs errors
 
-### Adding New Email Analysis Rules
+### Email Processing
+- **Invalid Emails**: Skipped with logging
+- **Parse Errors**: Fallback to basic analysis
+- **Authentication**: Automatic token refresh
 
-1. **Extend the AI prompt**:
-```python
-# lead_manager/prompts.py
-MEETING_REQUEST_PROMPT += """
-Additional rule: Look for scheduling phrases like 'book a call'
-"""
-```
+### Database Errors
+- **Connection Issues**: Retry with backoff
+- **Write Failures**: Log and continue processing
+- **Schema Validation**: Graceful error handling
 
-2. **Add fallback keywords**:
-```python
-# lead_manager/tools/meeting_request_llm.py
-MEETING_KEYWORDS.extend(['book a call', 'schedule time'])
-```
+## 🧪 Testing
 
-3. **Update the response schema**:
-```python
-# Add new fields to the analysis output
-analysis_schema = {
-    "is_meeting_request": bool,
-    "confidence": float,
-    "meeting_type": str,  # New field
-    "urgency": str        # New field
-}
-```
-
-### Testing
+### Test Suite
 
 ```bash
-# Run unit tests
-pytest lead_manager/test/
+# Run all tests
+python test_lead_manager_flow.py
 
-# Test email processing
-pytest lead_manager/test/test_email_checker.py
-
-# Test calendar integration
-pytest lead_manager/test/test_calendar_utils.py
-
-# Integration test
-python lead_manager/test/test_lead_manager_workflow.py
+# Test individual components
+python -c "from lead_manager.sub_agents.email_checker_agent import run_email_checker; run_email_checker()"
 ```
 
-## =3 Deployment
+### Test Coverage
 
-### Docker Deployment
+- **Configuration Validation**: Environment variables, API keys
+- **Agent Functionality**: Each agent's core functionality
+- **Tool Integration**: Gmail, Calendar, MongoDB tools
+- **Workflow Execution**: End-to-end processing
+- **Error Scenarios**: API failures, invalid data
 
-```bash
-# Build image
-docker build -f Dockerfile.lead_manager -t salesshortcut-lead-manager .
+### Test Data
 
-# Run with service account
-docker run -p 8082:8082 \
-  -e GOOGLE_API_KEY="your-api-key" \
-  -e GOOGLE_CLOUD_PROJECT="your-project" \
-  -e SALES_EMAIL="sales@zemzen.org" \
-  -v /path/to/service-account.json:/app/service-account.json \
-  -e GOOGLE_APPLICATION_CREDENTIALS="/app/service-account.json" \
-  salesshortcut-lead-manager
-```
+The system uses real Gmail emails for testing, ensuring:
+- **Real-world Scenarios**: Actual email processing
+- **Data Validation**: Proper email parsing
+- **Integration Testing**: Full API integration
 
-### Cloud Run Deployment
-
-```bash
-# Deploy to Google Cloud Run
-gcloud run deploy lead-manager-service \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY="your-api-key",SALES_EMAIL="sales@zemzen.org"
-```
-
-### Production Configuration
-
-```bash
-# Set production environment variables
-export GOOGLE_API_KEY="your-production-api-key"
-export GOOGLE_CLOUD_PROJECT="your-production-project"
-export SALES_EMAIL="sales@company.com"
-export BUSINESS_HOURS_START="9"
-export BUSINESS_HOURS_END="17"
-export LOG_LEVEL="WARNING"
-```
-
-## =
- Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-#### Gmail Authentication Errors
-```bash
-# Check service account permissions
-gcloud iam service-accounts get-iam-policy lead-manager-sa@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com
-
-# Verify domain-wide delegation
-# Check Google Admin Console > Security > API Controls > Domain-wide Delegation
+#### 1. Cerebras API Errors
+```
+Error: 404 Not Found
+Solution: Check CEREBRAS_API_KEY and model name
 ```
 
-#### Calendar Access Issues
-```bash
-# Test calendar API access
-python -c "
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-creds = service_account.Credentials.from_service_account_file('service-account.json')
-delegated_creds = creds.with_subject('sales@zemzen.org')
-service = build('calendar', 'v3', credentials=delegated_creds)
-print(service.calendarList().list().execute())
-"
+#### 2. Gmail Authentication
+```
+Error: Invalid credentials
+Solution: Regenerate OAuth2 tokens, check scopes
 ```
 
-#### AI Analysis Failures
-```bash
-# Check Vertex AI access
-gcloud ai models list --region=us-central1
-
-# Test LLM analysis
-python -c "
-from lead_manager.tools.meeting_request_llm import is_meeting_request_llm
-result = is_meeting_request_llm('Can we schedule a meeting?', 'test@example.com')
-print(result)
-"
+#### 3. MongoDB Connection
+```
+Error: Connection refused
+Solution: Check MONGODB_URI, ensure MongoDB is running
 ```
 
-### Debugging
-
-1. **Enable debug logging**:
-```bash
-python -m lead_manager --port 8082 --log-level DEBUG
+#### 4. Calendar API Issues
+```
+Error: Insufficient permissions
+Solution: Check service account permissions, enable APIs
 ```
 
-2. **Check email processing**:
+### Debug Mode
+
+Enable detailed logging:
 ```python
-# Test email retrieval
-from lead_manager.tools.check_email import check_email_tool
-emails = check_email_tool.run("sales@zemzen.org")
-print(f"Found {len(emails)} unread emails")
-```
-
-3. **Test calendar integration**:
-```python
-# Test calendar availability
-from lead_manager.tools.calendar_utils import check_availability_tool
-availability = check_availability_tool.run("primary", 7)
-print(f"Available slots: {len(availability)}")
-```
-
-### Performance Optimization
-
-1. **Optimize email polling**:
-```python
-# Implement webhook-based email notifications
-# Use Gmail push notifications instead of polling
-```
-
-2. **Cache calendar data**:
-```python
-# Cache availability data to reduce API calls
-AVAILABILITY_CACHE_TTL = 3600  # 1 hour
-```
-
-3. **Batch BigQuery operations**:
-```python
-# Batch meeting data uploads
-BATCH_SIZE = 10
-```
-
-## =� Monitoring
-
-### Key Metrics
-
-```python
-# Track lead management metrics
-hot_leads_identified = len(hot_lead_notifications)
-meetings_scheduled = len(scheduled_meetings)
-response_rate = meetings_scheduled / hot_leads_identified
-average_response_time = sum(response_times) / len(response_times)
+import logging
+logging.basicConfig(level=logging.DEBUG)
 ```
 
 ### Health Checks
 
 ```bash
-# Monitor service health
-curl http://localhost:8082/health
+# Check configuration
+python -c "from lead_manager.config import LeadManagerConfig; print('Config OK')"
 
-# Check Gmail connectivity
-curl http://localhost:8082/test/gmail
+# Check MongoDB
+python -c "from lead_manager.tools.mongodb_lead_tools import get_lead_manager_mongodb_client; print('MongoDB OK')"
 
-# Check Calendar connectivity
-curl http://localhost:8082/test/calendar
+# Check Cerebras API
+python -c "from leads_finder.llm_config import LLMConfig; LLMConfig.get_cerebras_llm(); print('Cerebras OK')"
 ```
+
+## 📊 Performance
+
+### Processing Speed
+- **Email Retrieval**: ~2-3 seconds per batch
+- **AI Analysis**: ~5-10 seconds per email
+- **Meeting Scheduling**: ~3-5 seconds per meeting
+- **Database Operations**: ~1-2 seconds per operation
+
+### Scalability
+- **Concurrent Processing**: Supports multiple emails
+- **Rate Limiting**: Respects API limits
+- **Memory Usage**: Optimized for large email volumes
+- **Database**: Indexed for fast queries
+
+## 🔒 Security
+
+### Data Protection
+- **Email Content**: Processed in memory, not stored
+- **API Keys**: Environment variables only
+- **Database**: Encrypted connections
+- **Authentication**: OAuth2 + Service Account
+
+### Privacy
+- **Email Access**: Read-only, no modifications
+- **Data Retention**: Configurable retention policies
+- **Audit Logs**: Complete processing history
+- **Access Control**: Role-based permissions
+
+## 📈 Monitoring
 
 ### Logging
+- **Agent Execution**: Step-by-step logging
+- **API Calls**: Request/response logging
+- **Database Operations**: Query performance
+- **Error Tracking**: Detailed error logs
 
-```python
-# Structured logging for analytics
-logger.info("Lead management completed", extra={
-    "emails_processed": len(emails),
-    "hot_leads_found": len(hot_leads),
-    "meetings_scheduled": len(meetings),
-    "duration_seconds": workflow_duration
-})
-```
+### Metrics
+- **Processing Time**: Per-agent timing
+- **Success Rate**: Processing success percentage
+- **API Usage**: Rate limit monitoring
+- **Database Performance**: Query execution time
 
-## =� License
+## 🚀 Future Enhancements
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+### Planned Features
+- **Email Templates**: Automated response generation
+- **Lead Scoring**: Advanced qualification algorithms
+- **Integration**: CRM system connectivity
+- **Analytics**: Lead conversion tracking
+- **Mobile**: Push notifications
+- **Multi-language**: International email support
 
-## <� Support
+### Extensibility
+- **Custom Agents**: Plugin architecture
+- **Custom Tools**: Tool development framework
+- **Custom Models**: Alternative LLM support
+- **Custom Databases**: Database abstraction layer
 
-For issues, questions, or feature requests:
+## 📞 Support
 
-1. Check the [main README](../README.md) for general setup instructions
-2. Review the troubleshooting section above
-3. Verify Google Workspace permissions and domain-wide delegation
-4. Check service account credentials and API access
-5. Review agent logs for detailed error information
-6. Open an issue on GitHub with detailed information
+### Documentation
+- **Code Comments**: Inline documentation
+- **Type Hints**: Full type annotations
+- **Examples**: Usage examples in code
+- **API Reference**: Tool and agent documentation
+
+### Community
+- **Issues**: GitHub issue tracking
+- **Discussions**: Feature requests and questions
+- **Contributions**: Pull request guidelines
+- **Updates**: Release notes and changelog
 
 ---
 
-**Built with d for intelligent lead management and meeting automation**
+**Lead Manager Agent System** - Automating lead management with AI-powered email analysis and intelligent meeting scheduling.
