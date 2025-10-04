@@ -13,6 +13,7 @@ class CerebrasConfig:
     
     # Cerebras API endpoint (OpenAI-compatible). Defaults to public endpoint
     BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
+    # API_KEY = os.getenv("CEREBRAS_API_KEY")
     
     @classmethod
     def get_client(cls) -> Cerebras:
@@ -52,7 +53,7 @@ class CerebrasConfig:
             api_key=api_key,
             base_url=cls.BASE_URL,
             temperature=temperature,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod

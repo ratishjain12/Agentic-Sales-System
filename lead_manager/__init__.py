@@ -1,0 +1,1 @@
+"""Lead Manager module for email checking and lead management."""
