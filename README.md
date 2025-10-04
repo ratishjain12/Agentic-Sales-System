@@ -51,6 +51,46 @@ Run the main application:
 python main.py
 ```
 
+### FastAPI Server
+
+Start the REST API server:
+
+```bash
+# Easy startup with dependency checking
+python start_server.py
+
+# Or run directly
+python server/run.py
+```
+
+Access the API:
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Root Endpoint**: http://localhost:8000/
+
+### Server Testing
+
+Test the API server:
+
+```bash
+python test_server.py
+```
+
+### Email Testing
+
+Test email functionality:
+
+```bash
+# Test OAuth2 setup
+python test_send_email.py --setup-only
+
+# Test email tool
+python test_send_email.py --tool-only
+
+# Test full email agent
+python test_send_email.py --agent
+```
+
 ### Demo Mode
 
 Run the interactive demo:
@@ -80,6 +120,9 @@ python test_foursquare_api.py
 ```
 agentic-sales-agent/
 ├── main.py                          # Main entry point
+├── start_server.py                  # Server startup script
+├── test_server.py                   # Server test script
+├── test_send_email.py               # Email testing script
 ├── pyproject.toml                   # Modern Python packaging
 ├── requirements.txt                  # Dependencies
 ├── .python-version                   # Python version specification
@@ -101,6 +144,18 @@ agentic-sales-agent/
 │       ├── cluster_search.py       # OSM cluster search tool
 │       └── map_search.py           # Map search tool
 ├── sdr/                            # Sales Development Rep module
+│   ├── agents/                     # SDR agents
+│   ├── tools/                      # SDR tools (email, phone, etc.)
+│   └── prompts/                    # Agent prompts
+├── server/                         # FastAPI REST API server
+│   ├── main.py                     # FastAPI application
+│   ├── run.py                      # Server startup
+│   ├── config.py                   # Server configuration
+│   ├── models.py                   # Pydantic models
+│   ├── utils.py                    # Utility functions
+│   ├── requirements.txt            # Server dependencies
+│   ├── Dockerfile                  # Docker configuration
+│   └── README.md                   # Server documentation
 └── tests/                          # Test files
     ├── test_configuration.py
     ├── test_foursquare_api.py
