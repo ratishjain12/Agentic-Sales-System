@@ -145,19 +145,35 @@ class ClusterSearchTool(BaseTool):
     name: str = "cluster_search"
     description: str = "Find businesses in a given city using OSM (Overpass) + clustering; returns structured results."
 
-    def _run(self, query: str) -> Any:  
+    def _run(self, query: str) -> str:  
         print("cluster search tool called!!")
         city = (query or "").strip()
         if not city:
-            return []
+            return "[]"
 
         geo = _geocode_city(city)
         if not geo:
-            return []
+            return "[]"
 
         elements = _overpass_businesses(geo["lat"], geo["lon"], radius_m=3000)
         normalized = [_normalize_osm(el, city) for el in elements if el.get("tags", {}).get("name")]
         deduped = _dedupe(normalized)
         clusters = _cluster(deduped, threshold_m=150)
 
-        return [_representative(c) for c in clusters]
+        # Convert to MongoDB-compatible format
+        mongodb_results = []
+        for business in [_representative(c) for c in clusters]:
+            mongodb_business = {
+                "name": business.get('name', ''),
+                "address": business.get('address', ''),
+                "phone": business.get('phone'),
+                "website": business.get('website'),
+                "category": business.get('category'),
+                "rating": None,  # OSM doesn't provide ratings
+                "source": "cluster_search"
+            }
+            mongodb_results.append(mongodb_business)
+        
+        # Return JSON string for MongoDB upload tool
+        import json
+        return json.dumps(mongodb_results)
