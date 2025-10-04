@@ -15,7 +15,7 @@ load_dotenv('.env')
 
 from leads_finder.clients.map_search_service import search_leads, analyze_leads
 from leads_finder.sub_agents.cluster_search_agent import run_cluster_search
-from sdr.agents.sdr_crew import execute_sdr_workflow
+from sdr.agents.sdr_main_agent import execute_sdr_main_workflow
 from sdr.tools.phone_call_tool import phone_call_tool
 
 
@@ -250,7 +250,7 @@ def run_complete_sdr_workflow():
     print("This will take several minutes...")
     
     try:
-        results = execute_sdr_workflow(business_data)
+        results = execute_sdr_main_workflow(business_data)
         
         print("\n" + "=" * 70)
         print("SDR WORKFLOW RESULTS")

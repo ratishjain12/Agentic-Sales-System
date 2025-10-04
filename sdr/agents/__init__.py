@@ -16,10 +16,10 @@ from .outreach_caller_agent import outreach_caller_agent, create_outreach_caller
 from .conversation_classifier_agent import conversation_classifier_agent, create_conversation_classifier_agent
 from .lead_clerk_agent import lead_clerk_agent, create_lead_clerk_agent
 from .outreach_email_agent import outreach_email_agent, create_outreach_email_agent
-from .sdr_crew import (
-    SDRCrew,
-    sdr_crew,
-    execute_sdr_workflow
+from .sdr_main_agent import (
+    SDRAgent,
+    sdr_main_agent,
+    execute_sdr_main_workflow
 )
 
 __all__ = [
@@ -49,8 +49,8 @@ __all__ = [
     'research_crew',
     'research_business',
 
-    # SDR crew (complete workflow)
-    'SDRCrew',
-    'sdr_crew',
-    'execute_sdr_workflow',
+    # SDR main agent (complete workflow)
+    'SDRAgent',
+    'sdr_main_agent',
+    'execute_sdr_main_workflow',
 ]
