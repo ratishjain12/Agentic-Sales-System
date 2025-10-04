@@ -13,4 +13,7 @@ wheels/
 # Test files
 test_*
 .DS_Store
-uv.lock
+uv.lock.secrets/
+*.json
+
+.secrets/

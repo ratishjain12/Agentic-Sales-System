@@ -10,3 +10,7 @@ uvicorn
 crewai
 crewai_tools
 pymongo
+elevenlabs
+google-auth
+google-auth-oauthlib
+google-api-python-client
