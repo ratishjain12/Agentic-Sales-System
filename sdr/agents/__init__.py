@@ -12,6 +12,15 @@ from .research_crew import (
     research_crew,
     research_business
 )
+from .outreach_caller_agent import outreach_caller_agent, create_outreach_caller_agent
+from .conversation_classifier_agent import conversation_classifier_agent, create_conversation_classifier_agent
+from .lead_clerk_agent import lead_clerk_agent, create_lead_clerk_agent
+from .outreach_email_agent import outreach_email_agent, create_outreach_email_agent
+from .sdr_crew import (
+    SDRCrew,
+    sdr_crew,
+    execute_sdr_workflow
+)
 
 __all__ = [
     # Individual agents
@@ -21,6 +30,14 @@ __all__ = [
     'create_fact_checker_agent',
     'research_lead_agent',
     'create_research_lead_agent',
+    'outreach_caller_agent',
+    'create_outreach_caller_agent',
+    'conversation_classifier_agent',
+    'create_conversation_classifier_agent',
+    'lead_clerk_agent',
+    'create_lead_clerk_agent',
+    'outreach_email_agent',
+    'create_outreach_email_agent',
 
     # Proposal generator crew
     'ProposalGeneratorCrew',
@@ -31,4 +48,9 @@ __all__ = [
     'ResearchCrew',
     'research_crew',
     'research_business',
+
+    # SDR crew (complete workflow)
+    'SDRCrew',
+    'sdr_crew',
+    'execute_sdr_workflow',
 ]

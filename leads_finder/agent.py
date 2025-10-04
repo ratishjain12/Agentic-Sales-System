@@ -96,20 +96,21 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
         role="LeadFinderAgent",
         goal=f"Find and store real business leads for {city} and present results in a formatted table",
         backstory=(
-            "You are a business lead discovery specialist. You have access to "
-            "Foursquare Places API for finding restaurants and businesses, "
-            "custom cluster search for additional leads, and MongoDB upload tool "
-            "for storing the results. You must use these tools to find real businesses "
-            "and store them in the database. After completing all tool calls, "
-            "you MUST present the final results in a clean markdown table format "
+            "You are a business lead discovery specialist with access to powerful tools. "
+            "You MUST use the foursquare_search_tool to find businesses via Foursquare Places API, "
+            "the cluster_search_tool to find additional businesses via OpenStreetMap data, "
+            "and the mongodb_upload_tool to store results in the database. "
+            "Your job is to execute these tools in sequence, collect real business data, "
+            "upload it to MongoDB, and then present the results in a clean markdown table format "
             "with columns: Business Name, Address, Phone, Website, Category, Rating, Source. "
-            "Include a summary section at the end with total counts and source breakdown."
+            "Include a summary section with total counts and source breakdown. "
+            "DO NOT just return query parameters - you must actually call the tools and process their results."
         ),
         tools=[foursquare_tool, cluster_tool, mongodb_tool],
         llm=get_crewai_llm(model="cerebras/gpt-oss-120b", temperature=0.1),
         verbose=True,
         allow_delegation=False,
-        max_iter=5,
+        max_iter=10,  # Increased iterations to allow for tool calls
         max_execution_time=600,  # 10 minutes total
         memory=False,
         planning=False
@@ -118,24 +119,28 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
     # Create the main lead finding task
     lead_finding_task = Task(
         description=f"""
-        Find real business leads in {city} for {business_type} and store them in MongoDB:
+        You are a business lead discovery specialist. Your task is to find real business leads in {city} for {business_type} and store them in MongoDB.
         
-        Step 1: Use foursquare_search_tool to find {business_type} in {city}
-        - Call with query="{business_type}", location="{city}", radius=5000, limit=10
+        IMPORTANT: You MUST use the available tools to perform actual searches and database operations.
         
-        Step 2: Use cluster_search_tool to find additional {business_type} businesses
-        - Call with query="{city} {business_type}"
+        Step 1: Search for businesses using Foursquare
+        - Use the foursquare_search_tool with query="{business_type}", location="{city}", radius=5000, limit=10
+        - This will return JSON data with business information
         
-        Step 3: Use mongodb_upload_tool to store the results
-        - Combine results from steps 1 and 2 into JSON format
-        - Add source field: "map_search" for Foursquare results, "cluster_search" for cluster results
-        - Call mongodb_upload_tool with the JSON data
+        Step 2: Search for additional businesses using cluster search
+        - Use the cluster_search_tool with query="{city} {business_type}"
+        - This will return additional business data in JSON format
         
-        Step 4: Present final results
-        - Create a markdown table with all found businesses
-        - Include summary statistics at the end
+        Step 3: Upload results to MongoDB
+        - Combine the results from both searches
+        - Ensure each business has a "source" field: "map_search" for Foursquare results, "cluster_search" for cluster results
+        - Use the mongodb_upload_tool to store the combined results
         
-        You must actually call these tools and use their real results.
+        Step 4: Present results in markdown table format
+        - Create a clean table with columns: Business Name | Address | Phone | Website | Category | Rating | Source
+        - Include a summary section with statistics
+        
+        You MUST call these tools in sequence and use their actual results. Do not just return the query parameters.
         """,
         agent=root_agent,
         expected_output=(

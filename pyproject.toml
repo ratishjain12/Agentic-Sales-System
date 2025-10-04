@@ -38,6 +38,7 @@ dependencies = [
     "uvicorn",
     "crewai",
     "crewai_tools",
+    "elevenlabs>=1.0.0",
 ]
 
 [project.optional-dependencies]

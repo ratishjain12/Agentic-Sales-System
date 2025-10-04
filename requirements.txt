@@ -10,3 +10,4 @@ uvicorn
 crewai
 crewai_tools
 pymongo
+elevenlabs
