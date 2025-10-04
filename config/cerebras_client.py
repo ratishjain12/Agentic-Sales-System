@@ -12,8 +12,8 @@ class CerebrasConfig:
     _llm: Optional[LLM] = None
     
     # Cerebras API endpoint (OpenAI-compatible). Defaults to public endpoint
-    BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
-    # API_KEY = os.getenv("CEREBRAS_API_KEY")
+    BASE_URL = os.getenv("CEREBRAS_BASE_URL")
+    API_KEY = os.getenv("CEREBRAS_API_KEY")
     
     @classmethod
     def get_client(cls) -> Cerebras:
