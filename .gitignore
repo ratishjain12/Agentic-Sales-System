@@ -16,4 +16,5 @@ test_*
 uv.lock.secrets/
 *.json
 
+credentials/
 .secrets/

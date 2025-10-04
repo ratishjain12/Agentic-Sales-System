@@ -13,8 +13,6 @@ from .agents import (
     create_conversation_classifier_agent,
     lead_clerk_agent,
     create_lead_clerk_agent,
-    outreach_email_agent,
-    create_outreach_email_agent,
 
     # Proposal generator crew
     proposal_generator_crew,
@@ -45,8 +43,6 @@ __all__ = [
     'create_conversation_classifier_agent',
     'lead_clerk_agent',
     'create_lead_clerk_agent',
-    'outreach_email_agent',
-    'create_outreach_email_agent',
 
     # Proposal generator crew
     'proposal_generator_crew',

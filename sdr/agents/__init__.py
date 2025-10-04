@@ -15,7 +15,6 @@ from .research_crew import (
 from .outreach_caller_agent import outreach_caller_agent, create_outreach_caller_agent
 from .conversation_classifier_agent import conversation_classifier_agent, create_conversation_classifier_agent
 from .lead_clerk_agent import lead_clerk_agent, create_lead_clerk_agent
-from .outreach_email_agent import outreach_email_agent, create_outreach_email_agent
 from .sdr_main_agent import (
     SDRAgent,
     sdr_main_agent,
@@ -36,8 +35,6 @@ __all__ = [
     'create_conversation_classifier_agent',
     'lead_clerk_agent',
     'create_lead_clerk_agent',
-    'outreach_email_agent',
-    'create_outreach_email_agent',
 
     # Proposal generator crew
     'ProposalGeneratorCrew',

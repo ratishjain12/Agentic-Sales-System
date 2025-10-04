@@ -15,8 +15,8 @@ from ..prompts.classifier_prompts import CONVERSATION_CLASSIFIER_PROMPT
 from ..config.sdr_config import get_sdr_llm
 from ..tools.exa_search_tool import ExaSearchTool
 from ..tools.phone_call_tool import phone_call_tool
-from ..tools.email_tool import email_tool
 from ..tools.data_storage_tool import data_storage_tool
+from .outreach_email_agent.sub_agents.email_sender.email_agent import email_agent
 import json
 
 
@@ -36,7 +36,8 @@ class SDRAgent:
         self.outreach_caller = self._create_outreach_caller()
         self.classifier = self._create_classifier()
         self.lead_clerk = self._create_lead_clerk()
-        self.email_outreach = self._create_email_outreach()
+        # Use the email agent system (crafter + sender)
+        self.email_agent = email_agent
 
     def _create_researcher(self) -> Agent:
         """Create Research Lead Agent with research tools."""
@@ -142,20 +143,19 @@ class SDRAgent:
             planning=False
         )
 
-    def _create_email_outreach(self) -> Agent:
-        """Create Email Outreach Agent with email tool."""
+    def _create_email_outreach_agent(self) -> Agent:
+        """Create Email Outreach Agent that coordinates with the email agent system."""
         return Agent(
-            role="Email Outreach Specialist",
-            goal="Send follow-up emails to interested business owners",
-            backstory="""You are an email marketing specialist who creates professional follow-up 
-            communications. You send personalized email proposals to business owners who 
-            expressed interest in phone conversations.""",
-            tools=[email_tool],
+            role="Email Outreach Coordinator",
+            goal="Coordinate email outreach using the email agent system (crafter + sender)",
+            backstory="""You are an email outreach coordinator who determines when to send emails 
+            and provides the necessary context for the email agent system. You work with the 
+            email crafter and sender agents to create and send personalized follow-up communications.""",
             llm=get_sdr_llm(model="llama3.3-70b", temperature=0.5),
             verbose=True,
             allow_delegation=False,
             max_iter=2,
-            max_execution_time=180,
+            max_execution_time=300,
             memory=False,
             planning=False
         )
@@ -272,10 +272,10 @@ class SDRAgent:
             context=[classifier_task, caller_task]  # Uses classification and call results
         )
 
-        # Task 7: Email Outreach
+        # Task 7: Email Outreach (Using Email Agent System)
         email_task = Task(
             description=f"""
-            Send follow-up email to business if they agreed to receive proposal.
+            Coordinate email outreach using the email agent system if the business owner agreed to receive emails.
             
             ### BUSINESS DATA
             {business_info}
@@ -283,11 +283,17 @@ class SDRAgent:
             ### CONVERSATION RESULTS
             {{task_context}}
             
-            Create and send a professional follow-up email with the proposal if appropriate.
+            If the conversation results indicate interest or agreement to receive email:
+            1. Use the email agent system to craft a personalized email
+            2. The email crafter will create compelling content based on research and proposal
+            3. The email sender will send the email using Gmail Service Account
+            4. Provide confirmation of email sending
+            
+            If no interest or no email agreement, skip email sending.
             """,
-            expected_output="Email sent confirmation with details or skip message",
-            agent=self.email_outreach,
-            context=[clerk_task, classifier_task]  # Uses clerk and classification
+            expected_output="Email sent confirmation with details or skip message with reason",
+            agent=self._create_email_outreach_agent(),
+            context=[clerk_task, classifier_task, research_task, fact_check_task]  # Uses all relevant context
         )
 
         return [
@@ -299,6 +305,44 @@ class SDRAgent:
             clerk_task,
             email_task
         ]
+
+    def _send_email_via_agent_system(self, business_data: Dict[str, Any], research_result: str, proposal: str) -> Dict[str, Any]:
+        """
+        Helper method to send email using the email agent system (crafter + sender).
+        
+        Args:
+            business_data: Business information including email
+            research_result: Research findings
+            proposal: Generated proposal
+            
+        Returns:
+            Email sending result from the email agent system
+        """
+        try:
+            # Ensure business data has email field
+            if 'email' not in business_data or not business_data['email']:
+                return {
+                    "success": False,
+                    "message": "No email address available for sending",
+                    "business_name": business_data.get('name', 'Unknown')
+                }
+            
+            # Use the email agent system to send the email
+            # This will use both email crafter and sender agents
+            result = self.email_agent.send_outreach_email(
+                business_data=business_data,
+                research_result=research_result,
+                proposal=proposal
+            )
+            
+            return result
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error in email agent system: {str(e)}",
+                "business_name": business_data.get('name', 'Unknown')
+            }
 
     def execute_workflow(self, business_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -321,7 +365,7 @@ class SDRAgent:
                     self.outreach_caller,
                     self.classifier,
                     self.lead_clerk,
-                    self.email_outreach
+                    self._create_email_outreach_agent()
                 ],
                 tasks=tasks,
                 process=Process.sequential,  # Process.SEQUENTIAL - Automatic sequential execution
@@ -348,6 +392,21 @@ class SDRAgent:
                 "clerk_result": tasks[5].output.raw if tasks[5].output else "No clerk output",
                 "email_result": tasks[6].output.raw if tasks[6].output else "No email output",
             }
+            
+            # If email task completed and business has email, also try to send email using the email agent system
+            if tasks[6].output and "email" in business_data:
+                try:
+                    email_result = self._send_email_via_agent_system(
+                        business_data=business_data,
+                        research_result=results["research_result"],
+                        proposal=results["proposal_result"]
+                    )
+                    results["email_agent_system_result"] = email_result
+                except Exception as e:
+                    results["email_agent_system_result"] = {
+                        "success": False,
+                        "message": f"Error in email agent system: {str(e)}"
+                    }
             
             return results
             
