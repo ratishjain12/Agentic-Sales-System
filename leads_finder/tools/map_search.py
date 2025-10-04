@@ -39,13 +39,28 @@ def foursquare_search_tool(
         limit: Maximum number of results (max 50)
         
     Returns:
-        Formatted string containing business information
+        JSON string containing business information for MongoDB upload
     """
     results = _foursquare_search_safe(query, location, radius, limit)
     print(f"Search results type: {type(results)}")
     
-    # Return formatted text instead of JSON for better CrewAI agent processing
-    return _format_results(results)
+    # Convert results to MongoDB-compatible format
+    mongodb_results = []
+    for business in results:
+        mongodb_business = {
+            "name": business.get('name', ''),
+            "address": business.get('address', ''),
+            "phone": business.get('phone'),
+            "website": business.get('website'),
+            "category": ', '.join(business.get('categories', [])) if business.get('categories') else None,
+            "rating": business.get('rating'),
+            "source": "map_search"
+        }
+        mongodb_results.append(mongodb_business)
+    
+    # Return JSON string for MongoDB upload tool
+    import json
+    return json.dumps(mongodb_results)
 
 
 def _foursquare_search(

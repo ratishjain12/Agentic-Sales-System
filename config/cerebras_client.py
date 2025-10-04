@@ -52,9 +52,7 @@ class CerebrasConfig:
             api_key=api_key,
             base_url=cls.BASE_URL,
             temperature=temperature,
-            max_tokens=max_tokens,
             **kwargs
-            **kwargs,
         )
 
     @classmethod
