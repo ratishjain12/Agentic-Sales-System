@@ -383,32 +383,14 @@ async def run_lead_finder_workflow(city: str, business_type: str = "restaurants"
             business_list = _extract_businesses_from_table(result_str, city, business_type)
             leads_found = len(business_list)
         
-        # If we have business data, upload it directly to MongoDB
-        if business_list and session_id:
-            logger.info(f"🚀 Uploading {len(business_list)} businesses directly to MongoDB")
-            try:
-                from leads_finder.tools.mongodb_upload import upload_business_leads
-                
-                # Convert business list to JSON string
-                business_json = json.dumps(business_list)
-                
-                # Upload to MongoDB
-                upload_result = upload_business_leads(business_json, session_id)
-                logger.info(f"📤 MongoDB upload result: {upload_result}")
-                
-                # Extract stored count from upload result
-                if "Upload successful" in upload_result:
-                    stored_match = re.search(r'Verified in database: (\d+)', upload_result)
-                    if stored_match:
-                        stored_count = int(stored_match.group(1))
-                    else:
-                        stored_count = len(business_list)  # Assume all were stored
-                
-            except Exception as e:
-                logger.error(f"❌ Direct MongoDB upload failed: {str(e)}")
-                stored_count = 0
+        # Note: MongoDB upload is handled by the CrewAI agent's mongodb_upload_tool
+        # No need for direct upload here to avoid race conditions
+        if business_list:
+            stored_count = len(business_list)  # Assume agent uploaded successfully
+            logger.info(f"📤 Agent handled MongoDB upload for {len(business_list)} businesses")
         else:
-            logger.warning(f"⚠️ No business data found to upload or no session_id provided")
+            logger.warning(f"⚠️ No business data found to process")
+            stored_count = 0
         
         # Format the result as structured data if we have business data
         structured_result = None
