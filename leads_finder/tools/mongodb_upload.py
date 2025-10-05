@@ -16,6 +16,7 @@ class BusinessLead(BaseModel):
     name: str
     address: str
     phone: Optional[str] = None
+    email: Optional[str] = None  # Add email field
     website: Optional[str] = None
     category: Optional[str] = None
     rating: Optional[float] = None
@@ -36,7 +37,7 @@ class MongoDBUploadTool(BaseTool):
     Upload merged business leads to MongoDB database.
     
     Input should be a JSON string containing an array of business objects.
-    Each business should have: name, address, phone, website, category, rating, source.
+    Each business should have: name, address, phone, email, website, category, rating, source.
     
     The tool will:
     1. Validate business data format
@@ -51,6 +52,7 @@ class MongoDBUploadTool(BaseTool):
             "name": "Local Pizza Place",
             "address": "123 Main St, City, State",
             "phone": "555-123-4567",
+            "email": "info@pizzapalace.com",
             "website": null,
             "category": "Restaurant",
             "rating": 4.2,
@@ -142,7 +144,20 @@ class MongoDBUploadTool(BaseTool):
             except (ValueError, TypeError):
                 raise ValueError("Invalid rating format")
         
+        # Validate email if provided
+        if "email" in business and business["email"] is not None:
+            email = business["email"].strip()
+            if email and not self._is_valid_email(email):
+                raise ValueError(f"Invalid email format: {email}")
+            business["email"] = email if email else None
+        
         return BusinessLead(**business)
+    
+    def _is_valid_email(self, email: str) -> bool:
+        """Validate email format using basic regex."""
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email) is not None
     
     def _generate_business_id(self, business: BusinessLead) -> str:
         """Generate unique business ID for deduplication."""
@@ -253,6 +268,7 @@ if __name__ == "__main__":
             "name": "Test Restaurant",
             "address": "123 Test St, Test City, TC 12345",
             "phone": "555-123-4567",
+            "email": "info@testrestaurant.com",
             "website": null,
             "category": "Restaurant",
             "rating": 4.2,
@@ -262,6 +278,7 @@ if __name__ == "__main__":
             "name": "Test Shop",
             "address": "456 Test Ave, Test City, TC 12345",
             "phone": "555-987-6543",
+            "email": "contact@testshop.com",
             "website": "https://testshop.com",
             "category": "Retail",
             "rating": 3.8,

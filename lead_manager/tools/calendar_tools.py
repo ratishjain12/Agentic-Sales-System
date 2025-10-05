@@ -179,7 +179,7 @@ Meeting: {title}
 Looking forward to speaking with you!
 
 Best regards,
-Sales Team
+Ratish Jain
         """.strip()
 
 
