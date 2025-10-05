@@ -267,6 +267,9 @@ Focus on the specific business benefits for {business_data.get('business_type', 
 
             logger.info(f"Initiating call to {phone}")
 
+            # Store transcript messages for real-time capture
+            transcript_messages = []
+
             # Initiate the call
             logger.info(f"Using focused prompt: {focused_prompt[:100]}...")
             logger.info(f"Using first message: {FIRST_MESSAGE}")
@@ -341,45 +344,16 @@ Focus on the specific business benefits for {business_data.get('business_type', 
                     # Debug: Log conversation details occasionally for troubleshooting
                     if attempt == 1 or attempt % 10 == 0:  # Log every 10th attempt after first
                         logger.debug(f"Debug - Status: {status}, Attempt: {attempt}, Transcript: {len(conversation.transcript) if conversation.transcript else 0} messages")
-
-                    if status in ["in-progress"]:
-                        # Call is active, continue polling but don't timeout quickly
-                        # Wait a bit longer for conversation to finish
-                        if attempt > 40:  # After 40 seconds of being in-progress
-                            # Extract any transcript available so far (reference-compatible)
-                            turns = (
-                                getattr(conversation, "transcript", None)
-                                or getattr(conversation, "turns", None)
-                                or []
-                            )
-                            transcript = []
-                            for t in turns:
-                                role = getattr(t, "role", "unknown")
-                                msg = (
-                                    t.message if hasattr(t, "message") else
-                                    getattr(t, "text", "unknown")
-                                )
-                                if hasattr(msg, "text"):
-                                    msg = msg.text
-                                transcript.append({"role": role, "message": msg})
-
-                            logger.info(f"Call was active for {attempt} seconds. Returning current transcript.")
-                            return {
-                                "status": "done",
-                                "transcript": transcript,
-                                "conversation_id": conversation_id,
-                                "error": None,
-                                "note": f"Call was in progress for {attempt} seconds. May have been cut short due to timeout."
-                            }
-
-                    if status in ["done", "completed"]:
-                        # Extract transcript per reference ElevenLabs (handles nested/turns/TranscriptObject)
+                    
+                    # Capture transcript messages in real-time
+                    if hasattr(conversation, 'transcript') and conversation.transcript:
                         turns = (
                             getattr(conversation, "transcript", None)
                             or getattr(conversation, "turns", None)
                             or []
                         )
-                        transcript = []
+                        # Update transcript_messages with latest conversation data
+                        transcript_messages = []
                         for t in turns:
                             role = getattr(t, "role", "unknown")
                             msg = (
@@ -388,13 +362,27 @@ Focus on the specific business benefits for {business_data.get('business_type', 
                             )
                             if hasattr(msg, "text"):
                                 msg = msg.text
-                            transcript.append({"role": role, "message": msg})
+                            transcript_messages.append({"role": role, "message": msg})
 
-                        logger.info(f"Call completed successfully. Transcript length: {len(transcript)}")
+                    if status in ["in-progress"]:
+                        # Call is active, continue polling but don't timeout quickly
+                        # Wait a bit longer for conversation to finish
+                        if attempt > 40:  # After 40 seconds of being in-progress
+                            logger.info(f"Call was active for {attempt} seconds. Returning current transcript.")
+                            return {
+                                "status": "done",
+                                "transcript": transcript_messages,
+                                "conversation_id": conversation_id,
+                                "error": None,
+                                "note": f"Call was in progress for {attempt} seconds. May have been cut short due to timeout."
+                            }
+
+                    if status in ["done", "completed"]:
+                        logger.info(f"Call completed successfully. Transcript length: {len(transcript_messages)}")
 
                         return {
                             "status": "done",
-                            "transcript": transcript,
+                            "transcript": transcript_messages,
                             "conversation_id": conversation_id,
                             "error": None
                         }
@@ -446,5 +434,10 @@ Focus on the specific business benefits for {business_data.get('business_type', 
             }
 
 
-# Singleton instance
+# Singleton instance - can be created with custom parameters
+def create_phone_call_tool(**kwargs):
+    """Create a phone call tool instance with optional custom parameters."""
+    return PhoneCallTool(**kwargs)
+
+# Default singleton instance
 phone_call_tool = PhoneCallTool()
