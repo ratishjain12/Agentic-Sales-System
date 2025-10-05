@@ -12,11 +12,12 @@ from crewai import Crew, Task, Process, Agent
 from ..prompts.research_prompts import RESEARCH_LEAD_PROMPT
 from ..prompts.caller_prompts import OUTREACH_CALLER_AGENT_PROMPT
 from ..prompts.classifier_prompts import CONVERSATION_CLASSIFIER_PROMPT
+from ..prompts.email_prompts import OUTREACH_EMAIL_PROMPT
 from ..config.sdr_config import get_sdr_llm
 from ..tools.exa_search_tool import ExaSearchTool
 from ..tools.phone_call_tool import phone_call_tool
 from ..tools.data_storage_tool import data_storage_tool
-from .outreach_email_agent.sub_agents.email_sender.email_agent import email_agent
+from ..tools.email_sender_tool import email_sender_tool
 import json
 
 
@@ -36,8 +37,6 @@ class SDRAgent:
         self.outreach_caller = self._create_outreach_caller()
         self.classifier = self._create_classifier()
         self.lead_clerk = self._create_lead_clerk()
-        # Use the email agent system (crafter + sender)
-        self.email_agent = email_agent
 
     def _create_researcher(self) -> Agent:
         """Create Research Lead Agent with research tools."""
@@ -144,17 +143,20 @@ class SDRAgent:
         )
 
     def _create_email_outreach_agent(self) -> Agent:
-        """Create Email Outreach Agent that coordinates with the email agent system."""
+        """Create Email Outreach Agent that can actually send emails using the email sender tool."""
         return Agent(
-            role="Email Outreach Coordinator",
-            goal="Coordinate email outreach using the email agent system (crafter + sender)",
-            backstory="""You are an email outreach coordinator who determines when to send emails 
-            and provides the necessary context for the email agent system. You work with the 
-            email crafter and sender agents to create and send personalized follow-up communications.""",
+            role="Email Outreach Specialist",
+            goal="Send personalized follow-up emails to businesses that agreed to receive proposals using Gmail OAuth2",
+            backstory="""You are an email outreach specialist who crafts and sends personalized follow-up emails 
+            to businesses after successful phone conversations. You have access to the email_sender tool which 
+            uses Gmail OAuth2 to send emails. You create compelling, personalized emails based on research 
+            findings and proposals, then send them using the email_sender tool. You ensure emails are 
+            professional, engaging, and tailored to each specific business.""",
+            tools=[email_sender_tool],
             llm=get_sdr_llm(model="llama3.3-70b", temperature=0.5),
             verbose=True,
             allow_delegation=False,
-            max_iter=2,
+            max_iter=3,
             max_execution_time=300,
             memory=False,
             planning=False
@@ -272,10 +274,10 @@ class SDRAgent:
             context=[classifier_task, caller_task]  # Uses classification and call results
         )
 
-        # Task 7: Email Outreach (Using Email Agent System)
+        # Task 7: Email Outreach (Using Email Sender Tool)
         email_task = Task(
             description=f"""
-            Coordinate email outreach using the email agent system if the business owner agreed to receive emails.
+            {OUTREACH_EMAIL_PROMPT}
             
             ### BUSINESS DATA
             {business_info}
@@ -283,15 +285,11 @@ class SDRAgent:
             ### CONVERSATION RESULTS
             {{task_context}}
             
-            If the conversation results indicate interest or agreement to receive email:
-            1. Use the email agent system to craft a personalized email
-            2. The email crafter will create compelling content based on research and proposal
-            3. The email sender will send the email using Gmail Service Account
-            4. Provide confirmation of email sending
-            
-            If no interest or no email agreement, skip email sending.
+            Based on the conversation results and classification, determine if the business owner agreed to receive emails.
+            If yes, craft and send a personalized follow-up email using the email_sender tool.
+            If no, provide a clear reason for skipping email sending.
             """,
-            expected_output="Email sent confirmation with details or skip message with reason",
+            expected_output="Email sent confirmation with message ID and details, or skip message with reason if no email agreement",
             agent=self._create_email_outreach_agent(),
             context=[clerk_task, classifier_task, research_task, fact_check_task]  # Uses all relevant context
         )
@@ -306,43 +304,6 @@ class SDRAgent:
             email_task
         ]
 
-    def _send_email_via_agent_system(self, business_data: Dict[str, Any], research_result: str, proposal: str) -> Dict[str, Any]:
-        """
-        Helper method to send email using the email agent system (crafter + sender).
-        
-        Args:
-            business_data: Business information including email
-            research_result: Research findings
-            proposal: Generated proposal
-            
-        Returns:
-            Email sending result from the email agent system
-        """
-        try:
-            # Ensure business data has email field
-            if 'email' not in business_data or not business_data['email']:
-                return {
-                    "success": False,
-                    "message": "No email address available for sending",
-                    "business_name": business_data.get('name', 'Unknown')
-                }
-            
-            # Use the email agent system to send the email
-            # This will use both email crafter and sender agents
-            result = self.email_agent.send_outreach_email(
-                business_data=business_data,
-                research_result=research_result,
-                proposal=proposal
-            )
-            
-            return result
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Error in email agent system: {str(e)}",
-                "business_name": business_data.get('name', 'Unknown')
-            }
 
     def execute_workflow(self, business_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -393,20 +354,8 @@ class SDRAgent:
                 "email_result": tasks[6].output.raw if tasks[6].output else "No email output",
             }
             
-            # If email task completed and business has email, also try to send email using the email agent system
-            if tasks[6].output and "email" in business_data:
-                try:
-                    email_result = self._send_email_via_agent_system(
-                        business_data=business_data,
-                        research_result=results["research_result"],
-                        proposal=results["proposal_result"]
-                    )
-                    results["email_agent_system_result"] = email_result
-                except Exception as e:
-                    results["email_agent_system_result"] = {
-                        "success": False,
-                        "message": f"Error in email agent system: {str(e)}"
-                    }
+            # Email integration is now handled directly in the main workflow task
+            # No need for additional email system call since the email task already handles it
             
             return results
             
@@ -444,3 +393,63 @@ def execute_sdr_main_workflow(business_data: Dict[str, Any]) -> Dict[str, Any]:
         >>> results = execute_sdr_main_workflow(business_data)
     """
     return sdr_main_agent.execute_workflow(business_data)
+
+
+if __name__ == "__main__":
+    """Test the SDR main agent directly."""
+    print("=== SDR Main Agent Direct Test ===")
+    print("=" * 50)
+    
+    # Get business data from user input
+    print("\n📝 Enter Business Information:")
+    business_name = input("Business Name: ").strip()
+    business_email = input("Business Email: ").strip()
+    business_phone = input("Business Phone (with country code): ").strip()
+    business_address = input("Business Address: ").strip()
+    business_industry = input("Industry: ").strip()
+    business_website = input("Website (optional): ").strip()
+    business_description = input("Brief Description: ").strip()
+    
+    # Create business data dictionary
+    business_data = {
+        "name": business_name,
+        "email": business_email,
+        "phone": business_phone,
+        "address": business_address,
+        "industry": business_industry,
+        "website": business_website if business_website else None,
+        "description": business_description
+    }
+    
+    print(f"Business: {business_data['name']}")
+    print(f"Email: {business_data['email']}")
+    print(f"Phone: {business_data['phone']}")
+    
+    try:
+        print(f"\n🚀 Starting Complete SDR Workflow...")
+        print("Flow: Research → Draft → Fact Check → Call → Classify → Clerk → Email")
+        
+        # Execute the complete SDR workflow
+        results = execute_sdr_main_workflow(business_data)
+        
+        print(f"\n📊 Workflow Results:")
+        print(f"Status: {results.get('status', 'Unknown')}")
+        
+        if results.get('email_result'):
+            print(f"\n📧 Email Result:")
+            print(f"   {results['email_result']}")
+        
+        if results.get('call_result'):
+            print(f"\n📞 Call Result:")
+            print(f"   {results['call_result']}")
+        
+        if results.get('research_result'):
+            print(f"\n🔍 Research Result:")
+            print(f"   {results['research_result'][:200]}...")
+        
+        print(f"\n🎉 SDR Main Agent test completed!")
+        
+    except Exception as e:
+        print(f"❌ Error in SDR workflow: {e}")
+        import traceback
+        traceback.print_exc()

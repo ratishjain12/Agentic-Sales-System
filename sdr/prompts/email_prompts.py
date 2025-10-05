@@ -39,15 +39,21 @@ Create a professional email that includes:
 - Use proper email formatting
 - Ensure all contact information is correct
 
+### EMAIL SENDER TOOL USAGE
+Use the email_sender tool with these parameters:
+- to_email: The business email address from business data
+- subject: Your crafted subject line
+- body: Your crafted email body (HTML format)
+- is_html: True
+
 ### OUTPUT FORMAT
-Provide the email in the following structure:
-```json
-{
-  "to": "business_email@example.com",
-  "subject": "Proposal for [Business Name] - ZemZen Web Solutions",
-  "body": "Complete email body with proper formatting",
-  "status": "ready_to_send"
-}
+After sending the email, provide confirmation in this format:
+```
+Email sent successfully!
+- Recipient: [email address]
+- Subject: [subject line]
+- Message ID: [Gmail message ID]
+- Status: Delivered
 ```
 
 ### IMPORTANT NOTES
@@ -56,6 +62,7 @@ Provide the email in the following structure:
 - Ensure professional formatting and tone
 - Double-check all contact information
 - Make next steps clear and actionable
+- Use the email_sender tool to actually send the email
 """
 
 
