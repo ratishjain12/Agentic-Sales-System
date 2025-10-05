@@ -18,7 +18,7 @@ class FoursquareSearchTool(BaseTool):
         "Parameters: query (business type), location (city/address), radius (meters), limit (max results)"
     )
 
-    def _run(self, query: str, location: str, radius: int = 1000, limit: int = 20) -> str:
+    def _run(self, query: str, location: str, radius: int = 1000, limit: int = 3) -> str:
         """Search for businesses using Foursquare Places API."""
         return foursquare_search_tool(query, location, radius, limit)
 
@@ -27,7 +27,7 @@ def foursquare_search_tool(
     query: str, 
     location: str, 
     radius: int = 1000, 
-    limit: int = 20
+    limit: int = 3
 ) -> str:
     """
     Search for businesses using Foursquare Places API.
@@ -51,6 +51,7 @@ def foursquare_search_tool(
             "name": business.get('name', ''),
             "address": business.get('address', ''),
             "phone": business.get('phone'),
+            "email": business.get('email'),  # Add email field
             "website": business.get('website'),
             "category": ', '.join(business.get('categories', [])) if business.get('categories') else None,
             "rating": business.get('rating'),
@@ -67,7 +68,7 @@ def _foursquare_search(
     query: str,
     location: str,
     radius: int = 1000,
-    limit: int = 20
+    limit: int = 3
 ) -> List[Dict[str, Any]]:
     """Internal method to perform Foursquare search."""
     api_key = os.getenv("FOURSQUARE_API_KEY")
@@ -123,6 +124,7 @@ def _foursquare_search(
             "name": place.get("name", ""),
             "address": _format_address(place.get("location", {})),
             "phone": place.get("contact", {}).get("phone"),
+            "email": place.get("contact", {}).get("email"),  # Add email field
             "website": place.get("contact", {}).get("website"),
             "rating": place.get("rating"),
             "distance": place.get("distance"),
@@ -137,7 +139,7 @@ def _foursquare_search_safe(
     query: str,
     location: str,
     radius: int = 1000,
-    limit: int = 20
+    limit: int = 3
 ) -> List[Dict[str, Any]]:
     """Safe wrapper for Foursquare search that always returns a list."""
     try:
@@ -222,6 +224,7 @@ Business #{i}:
 - Name: {business.get('name', 'Not available')}
 - Address: {business.get('address', 'Not available')}
 - Phone: {business.get('phone') or 'Not available'}
+- Email: {business.get('email') or 'Not available'}
 - Website: {business.get('website') or 'Not available'}
 - Rating: {business.get('rating') or 'Not available'}
 - Distance: {business.get('distance', 'Not available')}m

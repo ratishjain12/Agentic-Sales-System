@@ -29,7 +29,7 @@ Create a professional email that includes:
 4. **Proposal**: Include the detailed proposal discussed
 5. **Next Steps**: Clear call-to-action for the business
 6. **Contact Information**: Professional contact details
-7. **Closing**: Professional closing with your name and company
+7. **Closing**: Professional closing with signature "Best regards, Ratish Jain"
 
 ### EMAIL GUIDELINES
 - Keep the tone professional yet friendly
@@ -39,12 +39,20 @@ Create a professional email that includes:
 - Use proper email formatting
 - Ensure all contact information is correct
 
-### EMAIL SENDER TOOL USAGE
-Use the email_sender tool with these parameters:
-- to_email: The business email address from business data
-- subject: Your crafted subject line
-- body: Your crafted email body (HTML format)
-- is_html: True
+### EMAIL TEMPLATE EXAMPLE
+Your email body should follow this structure:
+```
+Dear [Business Owner Name],
+
+Thank you for taking the time to speak with me today about [specific topic from conversation].
+
+[Include the detailed proposal here]
+
+[Next steps and call-to-action]
+
+Best regards,
+Ratish Jain
+```
 
 ### OUTPUT FORMAT
 After sending the email, provide confirmation in this format:
@@ -62,6 +70,7 @@ Email sent successfully!
 - Ensure professional formatting and tone
 - Double-check all contact information
 - Make next steps clear and actionable
+- ALWAYS end the email with "Best regards, Ratish Jain"
 - Use the email_sender tool to actually send the email
 """
 
@@ -116,6 +125,9 @@ Provide the email in this exact format:
 [Your email body here]
 
 **Call-to-Action:** [Specific next step for the recipient]
+
+ Regards
+ Ratish Jain
 """
 
 EMAIL_SENDER_PROMPT = """

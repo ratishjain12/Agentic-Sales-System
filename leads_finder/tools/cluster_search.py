@@ -10,6 +10,7 @@ class Business(BaseModel):
     name: str = Field(..., description="Business name")
     address: Optional[str] = Field(None, description="Full address")
     phone: Optional[str] = Field(None, description="Contact phone")
+    email: Optional[str] = Field(None, description="Contact email")
     website: Optional[str] = Field(None, description="Business website")
     category: Optional[str] = Field(None, description="Business category/type")
     established: Optional[str] = Field(None, description="Year established if known")
@@ -78,6 +79,7 @@ def _normalize_osm(el: Dict[str, Any], city_fallback: str) -> Dict[str, Any]:
     ]
     address = ", ".join([p for p in parts if p]) or None
     phone = tags.get("phone") or tags.get("contact:phone")
+    email = tags.get("email") or tags.get("contact:email")  # Add email field
     website = tags.get("website") or tags.get("contact:website")
     category = tags.get("amenity") or tags.get("shop")
     established = tags.get("start_date")
@@ -85,6 +87,7 @@ def _normalize_osm(el: Dict[str, Any], city_fallback: str) -> Dict[str, Any]:
         "name": name,
         "address": address,
         "phone": phone,
+        "email": email,  # Add email field
         "website": website,
         "category": category,
         "established": established,
@@ -129,7 +132,7 @@ def _cluster(items: List[Dict[str, Any]], threshold_m: int = 150) -> List[List[D
 
 def _representative(cluster: List[Dict[str, Any]]) -> Dict[str, Any]:
     def score(it: Dict[str, Any]) -> int:
-        return sum(1 for k in ("address", "phone", "website", "category", "established") if it.get(k))
+        return sum(1 for k in ("address", "phone", "email", "website", "category", "established") if it.get(k))
     rep = max(cluster, key=score)
     rep_clean = {k: v for k, v in rep.items() if not k.startswith("_")}
     return Business(**rep_clean).model_dump()
@@ -167,12 +170,16 @@ class ClusterSearchTool(BaseTool):
                 "name": business.get('name', ''),
                 "address": business.get('address', ''),
                 "phone": business.get('phone'),
+                "email": business.get('email'),  # Add email field
                 "website": business.get('website'),
                 "category": business.get('category'),
                 "rating": None,  # OSM doesn't provide ratings
                 "source": "cluster_search"
             }
             mongodb_results.append(mongodb_business)
+        
+        # Limit results to 3 leads
+        mongodb_results = mongodb_results[:3]
         
         # Return JSON string for MongoDB upload tool
         import json

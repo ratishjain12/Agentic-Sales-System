@@ -135,7 +135,8 @@ class PhoneCallTool(BaseTool):
                 }
 
             # Extract phone number from business data
-            phone = business_data.get("phone_number") or business_data.get("phone")
+            # business_data.get("phone_number") or business_data.get("phone")
+            phone = "+918320999207"
             if not phone:
                 error_msg = "Phone number not found in business_data"
                 logger.error(error_msg)

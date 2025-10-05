@@ -5,6 +5,7 @@ Main Lead Finder Agent implementation using CrewAI.
 import logging
 from typing import Dict, Any, List, Optional
 from crewai import Agent, Task, Crew, Process
+from crewai.tools import BaseTool
 from leads_finder.prompts import ROOT_AGENT_PROMPT
 from leads_finder.sub_agents.potential_lead_finder_agent import create_potential_lead_finder_agent
 from leads_finder.sub_agents.merger_agent import merger_agent
@@ -26,8 +27,8 @@ def _format_business_results_as_table(business_list: List[Dict[str, Any]], city:
     # Create table header
     table_lines = [f"**{business_type.title()} Business Leads in {city}**"]
     table_lines.append("")
-    table_lines.append("| Business Name | Address | Phone | Website | Category | Rating | Source |")
-    table_lines.append("|---------------|---------|-------|---------|----------|--------|--------|")
+    table_lines.append("| Business Name | Address | Phone | Email | Website | Category | Rating | Source |")
+    table_lines.append("|---------------|---------|-------|-------|---------|----------|--------|--------|")
     
     # Count sources
     map_search_count = 0
@@ -38,6 +39,7 @@ def _format_business_results_as_table(business_list: List[Dict[str, Any]], city:
         name = business.get('name', 'N/A')
         address = business.get('address', 'N/A')
         phone = business.get('phone') or 'N/A'
+        email = business.get('email') or 'N/A'  # Add email field
         website = business.get('website') or 'N/A'
         if website == 'N/A':
             website = '–'
@@ -55,7 +57,7 @@ def _format_business_results_as_table(business_list: List[Dict[str, Any]], city:
         if len(address) > 30:
             address = address[:27] + "..."
         
-        table_lines.append(f"| {name} | {address} | {phone} | {website} | {category} | {rating} | {source} |")
+        table_lines.append(f"| {name} | {address} | {phone} | {email} | {website} | {category} | {rating} | {source} |")
     
     # Add summary
     table_lines.append("")
@@ -69,7 +71,7 @@ def _format_business_results_as_table(business_list: List[Dict[str, Any]], city:
     return "\n".join(table_lines)
 
 
-def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> Crew:
+def create_lead_finder_agent(city: str, business_type: str = "restaurants", session_id: Optional[str] = None) -> Crew:
     """
     Create the main Lead Finder Agent following the reference architecture.
     
@@ -81,6 +83,7 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
     Args:
         city: City name to search for business leads
         business_type: Type of business to search for (e.g., "restaurants", "jewellery", "cafe")
+        session_id: Optional session ID for tracking
         
     Returns:
         CrewAI Crew with sequential execution workflow
@@ -89,7 +92,18 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
     # Initialize tools
     foursquare_tool = foursquare_search_tool_instance
     cluster_tool = ClusterSearchTool()
-    mongodb_tool = mongodb_upload_tool_instance
+    
+    # Create a custom MongoDB upload tool that includes session_id
+    class SessionAwareMongoDBUploadTool(BaseTool):
+        name: str = "mongodb_upload_tool"
+        description: str = "Upload merged business leads to MongoDB database with session tracking."
+        
+        def _run(self, business_data: str) -> str:
+            """Upload business leads to MongoDB with the session_id."""
+            logger.info(f"Uploading leads to MongoDB with session_id: {session_id or 'default_session'}")
+            return mongodb_upload_tool_instance._run(business_data, session_id or 'default_session')
+    
+    mongodb_tool = SessionAwareMongoDBUploadTool()
     
     # Create the root Lead Finder Agent with actual tools
     root_agent = Agent(
@@ -124,7 +138,7 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
         IMPORTANT: You MUST use the available tools to perform actual searches and database operations.
         
         Step 1: Search for businesses using Foursquare
-        - Use the foursquare_search_tool with query="{business_type}", location="{city}", radius=5000, limit=10
+        - Use the foursquare_search_tool with query="{business_type}", location="{city}", radius=5000, limit=3
         - This will return JSON data with business information
         
         Step 2: Search for additional businesses using cluster search
@@ -137,7 +151,7 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
         - Use the mongodb_upload_tool to store the combined results
         
         Step 4: Present results in markdown table format
-        - Create a clean table with columns: Business Name | Address | Phone | Website | Category | Rating | Source
+        - Create a clean table with columns: Business Name | Address | Phone | Email | Website | Category | Rating | Source
         - Include a summary section with statistics
         
         You MUST call these tools in sequence and use their actual results. Do not just return the query parameters.
@@ -145,7 +159,7 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
         agent=root_agent,
         expected_output=(
             f"A **markdown table** showing {business_type} business leads found in {city}. "
-            "The table must have columns: Business Name | Address | Phone | Website | Category | Rating | Source. "
+            "The table must have columns: Business Name | Address | Phone | Email | Website | Category | Rating | Source. "
             "Include a **Summary** section below the table with: Total leads processed, New leads inserted, Source breakdown (map_search vs cluster_search). "
             "Do NOT return raw JSON or tool call outputs - only the formatted table and summary."
         ),
@@ -162,7 +176,7 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants") -> C
     return crew
 
 
-def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_results: int = 50, search_radius: int = 25000) -> Dict[str, Any]:
+def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_results: int = 3, search_radius: int = 25000, session_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Run the complete lead finder workflow.
     
@@ -171,6 +185,7 @@ def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_
         business_type: Type of business to search for (e.g., "restaurants", "jewellery", "cafe")
         max_results: Maximum number of results to return
         search_radius: Search radius in meters
+        session_id: Optional session ID for tracking
         
     Returns:
         Dictionary with workflow results and statistics
@@ -179,7 +194,7 @@ def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_
         logger.info(f"Starting lead finder workflow for {city} - {business_type}")
         
         # Create lead finder crew
-        crew = create_lead_finder_agent(city, business_type)
+        crew = create_lead_finder_agent(city, business_type, session_id)
         
         # Execute the workflow
         result = crew.kickoff()
@@ -237,15 +252,16 @@ def find_leads(city: str, business_type: str = "restaurants", **kwargs) -> Dict[
     Args:
         city: City name to search for business leads
         business_type: Type of business to search for (e.g., "restaurants", "jewellery", "cafe")
-        **kwargs: Additional search parameters
+        **kwargs: Additional search parameters including session_id
         
     Returns:
         Dictionary with lead discovery results
     """
-    max_results = kwargs.get('max_results', 50)
+    max_results = kwargs.get('max_results', 3)
     search_radius = kwargs.get('search_radius', 25000)
+    session_id = kwargs.get('session_id', None)
     
-    return run_lead_finder_workflow(city, business_type, max_results, search_radius)
+    return run_lead_finder_workflow(city, business_type, max_results, search_radius, session_id)
 
 
 # For compatibility with reference pattern
