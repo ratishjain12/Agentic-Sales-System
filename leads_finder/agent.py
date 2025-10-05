@@ -2,6 +2,7 @@
 Main Lead Finder Agent implementation using CrewAI.
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from crewai import Agent, Task, Crew, Process
@@ -19,8 +20,117 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _extract_businesses_from_table(table_str: str, city: str, business_type: str) -> List[Dict[str, Any]]:
+    """Extract business data from markdown table format."""
+    businesses = []
+    
+    try:
+        lines = table_str.split('\n')
+        in_table = False
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Skip header lines
+            if '| Business Name |' in line or '|---------------|' in line:
+                in_table = True
+                continue
+            
+            # Skip empty lines
+            if not line or not in_table:
+                continue
+            
+            # Parse table row
+            if line.startswith('|') and line.endswith('|'):
+                parts = [part.strip() for part in line.split('|')[1:-1]]  # Remove empty first/last parts
+                
+                if len(parts) >= 8:  # Ensure we have all columns
+                    business = {
+                        "name": parts[0],
+                        "address": parts[1],
+                        "phone": parts[2] if parts[2] != 'N/A' else None,
+                        "email": parts[3] if parts[3] != 'N/A' else None,
+                        "website": parts[4] if parts[4] not in ['N/A', '–'] else None,
+                        "category": parts[5] if parts[5] != 'N/A' else business_type.title(),
+                        "rating": float(parts[6]) if parts[6] != 'N/A' and parts[6].replace('.', '').isdigit() else None,
+                        "source": parts[7] if parts[7] != 'N/A' else "unknown"
+                    }
+                    businesses.append(business)
+        
+        logger.info(f"🔍 Extracted {len(businesses)} businesses from table format")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to extract businesses from table: {str(e)}")
+    
+    return businesses
+
+
+def _format_business_results_as_structured_data(business_list: List[Dict[str, Any]], city: str, business_type: str) -> Dict[str, Any]:
+    """Format business results as structured JSON data."""
+    if not business_list:
+        return {
+            "businesses": [],
+            "summary": {
+                "total_leads": 0,
+                "map_search_count": 0,
+                "cluster_search_count": 0,
+                "successfully_uploaded": False,
+                "city": city,
+                "business_type": business_type
+            }
+        }
+    
+    # Count sources
+    map_search_count = 0
+    cluster_search_count = 0
+    
+    # Clean and standardize business data
+    cleaned_businesses = []
+    for business in business_list:
+        # Count sources
+        source = business.get('source', 'unknown')
+        if source == 'map_search':
+            map_search_count += 1
+        elif source == 'cluster_search':
+            cluster_search_count += 1
+        
+        # Clean and standardize business data
+        cleaned_business = {
+            "name": business.get('name'),
+            "address": business.get('address'),
+            "phone": business.get('phone'),
+            "email": business.get('email'),
+            "website": business.get('website'),
+            "category": business.get('category', business_type.title()),
+            "rating": business.get('rating'),
+            "source": source,
+            "fsq_id": business.get('fsq_id'),
+            "distance": business.get('distance'),
+            "categories": business.get('categories', [])
+        }
+        
+        # Remove None values and convert to null for JSON
+        cleaned_business = {k: v for k, v in cleaned_business.items() if v is not None}
+        cleaned_businesses.append(cleaned_business)
+    
+    # Create structured result
+    result = {
+        "businesses": cleaned_businesses,
+        "summary": {
+            "total_leads": len(business_list),
+            "map_search_count": map_search_count,
+            "cluster_search_count": cluster_search_count,
+            "successfully_uploaded": True,
+            "city": city,
+            "business_type": business_type
+        }
+    }
+    
+    return result
+
+
 def _format_business_results_as_table(business_list: List[Dict[str, Any]], city: str, business_type: str) -> str:
-    """Format business results as a markdown table."""
+    """Format business results as a markdown table (legacy function)."""
     if not business_list:
         return f"No {business_type} businesses found in {city}."
     
@@ -94,16 +204,35 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants", sess
     cluster_tool = ClusterSearchTool()
     
     # Create a custom MongoDB upload tool that includes session_id
-    class SessionAwareMongoDBUploadTool(BaseTool):
-        name: str = "mongodb_upload_tool"
-        description: str = "Upload merged business leads to MongoDB database with session tracking."
+    class SessionAwareMongoDBUploadTool(mongodb_upload_tool_instance.__class__):
+        def __init__(self, session_id: str):
+            super().__init__()
+            # Store session_id as a private attribute
+            self._session_id = session_id
+            logger.info(f"🔍 SessionAwareMongoDBUploadTool initialized with session_id: {self._session_id}")
         
         def _run(self, business_data: str) -> str:
             """Upload business leads to MongoDB with the session_id."""
-            logger.info(f"Uploading leads to MongoDB with session_id: {session_id or 'default_session'}")
-            return mongodb_upload_tool_instance._run(business_data, session_id or 'default_session')
+            logger.info(f"🔍 SessionAwareMongoDBUploadTool using session_id: {self._session_id}")
+            
+            # Handle both string and list inputs
+            if isinstance(business_data, list):
+                # Convert list to JSON string
+                import json
+                business_data = json.dumps(business_data)
+                logger.info(f"🔍 Converted list to JSON string for MongoDB upload")
+            elif isinstance(business_data, str):
+                # Already a string, use as is
+                logger.info(f"🔍 Using string input for MongoDB upload")
+            else:
+                # Convert other types to JSON string
+                import json
+                business_data = json.dumps(business_data)
+                logger.info(f"🔍 Converted {type(business_data)} to JSON string for MongoDB upload")
+            
+            return mongodb_upload_tool_instance._run(business_data, self._session_id)
     
-    mongodb_tool = SessionAwareMongoDBUploadTool()
+    mongodb_tool = SessionAwareMongoDBUploadTool(session_id or 'default_session')
     
     # Create the root Lead Finder Agent with actual tools
     root_agent = Agent(
@@ -150,18 +279,21 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants", sess
         - Ensure each business has a "source" field: "map_search" for Foursquare results, "cluster_search" for cluster results
         - Use the mongodb_upload_tool to store the combined results
         
-        Step 4: Present results in markdown table format
-        - Create a clean table with columns: Business Name | Address | Phone | Email | Website | Category | Rating | Source
-        - Include a summary section with statistics
+        Step 4: Present results in structured JSON format
+        - Return the business data as a clean JSON array
+        - Include a summary object with statistics
+        - Ensure all business objects have consistent field names
         
         You MUST call these tools in sequence and use their actual results. Do not just return the query parameters.
         """,
         agent=root_agent,
         expected_output=(
-            f"A **markdown table** showing {business_type} business leads found in {city}. "
-            "The table must have columns: Business Name | Address | Phone | Email | Website | Category | Rating | Source. "
-            "Include a **Summary** section below the table with: Total leads processed, New leads inserted, Source breakdown (map_search vs cluster_search). "
-            "Do NOT return raw JSON or tool call outputs - only the formatted table and summary."
+            f"A **JSON object** containing {business_type} business leads found in {city}. "
+            "The JSON must have this structure: "
+            '{"businesses": [{"name": "...", "address": "...", "phone": "...", "email": "...", "website": "...", "category": "...", "rating": "...", "source": "..."}], '
+            '"summary": {"total_leads": 0, "map_search_count": 0, "cluster_search_count": 0, "successfully_uploaded": true}}. '
+            "Each business object must have all fields (use null for missing data). "
+            "Do NOT return markdown tables or raw tool outputs - only the structured JSON."
         ),
     )
     
@@ -176,9 +308,9 @@ def create_lead_finder_agent(city: str, business_type: str = "restaurants", sess
     return crew
 
 
-def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_results: int = 3, search_radius: int = 25000, session_id: Optional[str] = None) -> Dict[str, Any]:
+async def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_results: int = 3, search_radius: int = 25000, session_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Run the complete lead finder workflow.
+    Run the complete lead finder workflow with guaranteed MongoDB upload.
     
     Args:
         city: City name to search for business leads
@@ -192,44 +324,112 @@ def run_lead_finder_workflow(city: str, business_type: str = "restaurants", max_
     """
     try:
         logger.info(f"Starting lead finder workflow for {city} - {business_type}")
+        logger.info(f"🔍 Lead finder received session_id: {session_id}")
         
         # Create lead finder crew
         crew = create_lead_finder_agent(city, business_type, session_id)
         
-        # Execute the workflow
-        result = crew.kickoff()
+        # Execute the workflow asynchronously
+        result = await asyncio.to_thread(crew.kickoff)
         
         # Extract and format result
         result_str = str(result)
         
-        # If the result doesn't contain a table format, try to extract meaningful data
-        if "|" not in result_str and "Business Name" not in result_str:
-            # Try to extract data from JSON-like content in the result
-            import re
-            import json
-            
-            # Look for JSON patterns in the result
+        # Debug logging
+        logger.info(f"🔍 Lead finder result type: {type(result)}")
+        logger.info(f"🔍 Lead finder result length: {len(result_str)}")
+        logger.info(f"🔍 Lead finder result preview: {result_str[:200]}...")
+        
+        # Try to extract business data from the result and upload directly
+        leads_found = 0
+        stored_count = 0
+        business_list = []
+        
+        # Try to extract JSON data from the result
+        import re
+        import json
+        
+        # Look for structured JSON patterns (new format)
+        structured_pattern = r'{"businesses":\s*\[.*?\],\s*"summary":\s*{.*?}}'
+        structured_matches = re.findall(structured_pattern, result_str, re.DOTALL)
+        
+        if structured_matches:
+            try:
+                # Parse the structured JSON
+                structured_data = json.loads(structured_matches[0])
+                business_list = structured_data.get("businesses", [])
+                leads_found = len(business_list)
+                logger.info(f"🔍 Extracted {leads_found} businesses from structured JSON result")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to parse structured JSON from agent result: {str(e)}")
+        
+        # Fallback: Look for old array JSON patterns
+        if not business_list:
             json_pattern = r'\[{.*?}\]'
             json_matches = re.findall(json_pattern, result_str, re.DOTALL)
             
             if json_matches:
                 try:
-                    # Parse the JSON and format as table
+                    # Parse the JSON array
                     business_list = json.loads(json_matches[0])
-                    result_str = _format_business_results_as_table(business_list, city, business_type)
-                except:
-                    pass  # Keep original result if parsing fails
+                    leads_found = len(business_list)
+                    logger.info(f"🔍 Extracted {leads_found} businesses from array JSON result")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to parse array JSON from agent result: {str(e)}")
+        
+        # Final fallback: Try to extract from table format
+        if not business_list and "|" in result_str:
+            logger.info("🔍 Attempting to extract business data from table format")
+            business_list = _extract_businesses_from_table(result_str, city, business_type)
+            leads_found = len(business_list)
+        
+        # If we have business data, upload it directly to MongoDB
+        if business_list and session_id:
+            logger.info(f"🚀 Uploading {len(business_list)} businesses directly to MongoDB")
+            try:
+                from leads_finder.tools.mongodb_upload import upload_business_leads
+                
+                # Convert business list to JSON string
+                business_json = json.dumps(business_list)
+                
+                # Upload to MongoDB
+                upload_result = upload_business_leads(business_json, session_id)
+                logger.info(f"📤 MongoDB upload result: {upload_result}")
+                
+                # Extract stored count from upload result
+                if "Upload successful" in upload_result:
+                    stored_match = re.search(r'Verified in database: (\d+)', upload_result)
+                    if stored_match:
+                        stored_count = int(stored_match.group(1))
+                    else:
+                        stored_count = len(business_list)  # Assume all were stored
+                
+            except Exception as e:
+                logger.error(f"❌ Direct MongoDB upload failed: {str(e)}")
+                stored_count = 0
+        else:
+            logger.warning(f"⚠️ No business data found to upload or no session_id provided")
+        
+        # Format the result as structured data if we have business data
+        structured_result = None
+        if business_list:
+            structured_result = _format_business_results_as_structured_data(business_list, city, business_type)
+            result_str = json.dumps(structured_result, indent=2)
         
         workflow_result = {
             "success": True,
             "city": city,
             "business_type": business_type,
             "result": result_str,
+            "structured_data": structured_result,
             "max_results": max_results,
-            "search_radius": search_radius
+            "search_radius": search_radius,
+            "leads_found": leads_found,
+            "stored_count": stored_count
         }
         
         logger.info(f"Lead finder workflow completed for {city} - {business_type}")
+        logger.info(f"📊 Final stats: {leads_found} leads found, {stored_count} stored")
         return workflow_result
         
     except Exception as e:

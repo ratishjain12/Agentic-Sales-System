@@ -328,7 +328,7 @@ Focus on the specific business benefits for {business_data.get('business_type', 
             logger.info(f"Call initiated. Conversation ID: {conversation_id}")
 
             # Poll for conversation status
-            max_attempts = 60  # 1 minute with 1-second intervals (enough time for ring + answer)
+            max_attempts = 10  # 1 minute with 1-second intervals (enough time for ring + answer)
             attempt = 0
 
             while attempt < max_attempts:

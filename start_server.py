@@ -61,12 +61,7 @@ def start_server():
     # Check dependencies
     if not check_dependencies():
         return False
-    
-    # Check environment
-    if not check_environment():
-        print("\n⚠️  Server will start but some features may not work")
-        input("Press Enter to continue anyway, or Ctrl+C to exit...")
-    
+        
     print("\n🌐 Server Information:")
     print("   - API Docs: http://localhost:8000/docs")
     print("   - Health Check: http://localhost:8000/health")

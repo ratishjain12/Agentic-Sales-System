@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from crewai.tools import BaseTool
 from pydantic import Field, BaseModel
 from leads_finder.database import get_business_leads_collection, get_sessions_collection
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessLead(BaseModel):
@@ -73,6 +76,9 @@ class MongoDBUploadTool(BaseTool):
             Upload summary as string
         """
         try:
+            logger.info(f"🔍 MongoDB upload tool called with session_id: {session_id}")
+            logger.info(f"🔍 Business data length: {len(business_data)}")
+            
             # Parse JSON input
             businesses = json.loads(business_data)
             
@@ -100,6 +106,10 @@ class MongoDBUploadTool(BaseTool):
                         "session_id": session_id or str(uuid.uuid4()),
                         "lead_status": "new"
                     })
+                    
+                    # Debug logging
+                    logger.info(f"🔍 Storing lead with session_id: {lead_doc['session_id']}")
+                    logger.info(f"🔍 Lead email: {lead_doc.get('email', 'None')}")
                     
                     processed_leads.append(lead_doc)
                     
@@ -182,63 +192,146 @@ class MongoDBUploadTool(BaseTool):
         return deduplicated
     
     def _upload_to_mongodb(self, leads: List[Dict[str, Any]]) -> str:
-        """Upload leads to MongoDB with upsert logic."""
+        """Upload leads to MongoDB with synchronous verification and proper error handling."""
         if not leads:
             return "⚠️ No leads to upload"
         
         try:
             collection = get_business_leads_collection()
+            sessions_collection = get_sessions_collection()
+            session_id = leads[0]["session_id"]
             
-            # Use upsert to handle duplicates
+            logger.info(f"🚀 Starting MongoDB upload for session {session_id} with {len(leads)} leads")
+            
+            # First, mark session as "uploading" to prevent race conditions
+            sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "session_id": session_id,
+                    "status": "uploading",
+                    "created_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(timezone.utc),
+                    "leads_count": len(leads)
+                }},
+                upsert=True
+            )
+            logger.info(f"📝 Marked session {session_id} as 'uploading'")
+            
+            # Upload leads with individual verification
             upsert_count = 0
             insert_count = 0
+            failed_uploads = []
             
-            for lead in leads:
-                # Check if business already exists
-                existing = collection.find_one({"business_id": lead["business_id"]})
-                
-                if existing:
-                    # Update existing record
-                    lead["updated_at"] = datetime.now(timezone.utc)
-                    collection.update_one(
-                        {"business_id": lead["business_id"]},
-                        {"$set": lead}
-                    )
-                    upsert_count += 1
-                else:
-                    # Insert new record
-                    collection.insert_one(lead)
-                    insert_count += 1
+            for i, lead in enumerate(leads):
+                try:
+                    # Check if business already exists
+                    existing = collection.find_one({"business_id": lead["business_id"]})
+                    
+                    if existing:
+                        # Update existing record
+                        lead["updated_at"] = datetime.now(timezone.utc)
+                        result = collection.update_one(
+                            {"business_id": lead["business_id"]},
+                            {"$set": lead}
+                        )
+                        if result.modified_count > 0:
+                            upsert_count += 1
+                            logger.info(f"✅ Updated lead {i+1}/{len(leads)}: {lead.get('name', 'Unknown')}")
+                        else:
+                            logger.warning(f"⚠️ No changes made to lead {i+1}: {lead.get('name', 'Unknown')}")
+                    else:
+                        # Insert new record
+                        result = collection.insert_one(lead)
+                        if result.inserted_id:
+                            insert_count += 1
+                            logger.info(f"✅ Inserted lead {i+1}/{len(leads)}: {lead.get('name', 'Unknown')}")
+                        else:
+                            failed_uploads.append(f"Lead {i+1}: Insert failed")
+                            
+                except Exception as e:
+                    error_msg = f"Lead {i+1} ({lead.get('name', 'Unknown')}): {str(e)}"
+                    failed_uploads.append(error_msg)
+                    logger.error(f"❌ Upload failed for {error_msg}")
             
-            # Create session record
-            if leads:
-                session_id = leads[0]["session_id"]
+            # Verify upload completion by checking actual data in database
+            verification_count = collection.count_documents({"session_id": session_id})
+            logger.info(f"🔍 Verification: Found {verification_count} leads in database for session {session_id}")
+            
+            # Only mark as completed if we have successful uploads
+            if verification_count > 0:
                 session_doc = {
                     "session_id": session_id,
                     "created_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(timezone.utc),
                     "leads_count": len(leads),
+                    "verified_count": verification_count,
                     "insert_count": insert_count,
                     "upsert_count": upsert_count,
+                    "failed_count": len(failed_uploads),
                     "status": "completed"
                 }
                 
-                sessions_collection = get_sessions_collection()
                 sessions_collection.update_one(
                     {"session_id": session_id},
                     {"$set": session_doc},
                     upsert=True
                 )
-            
-            return f"""✅ Upload successful!
+                logger.info(f"✅ Session {session_id} marked as 'completed' with {verification_count} verified leads")
+                
+                # Final verification
+                final_session_record = sessions_collection.find_one({"session_id": session_id})
+                if final_session_record and final_session_record.get("status") == "completed":
+                    logger.info(f"🎉 Upload process completed successfully for session {session_id}")
+                else:
+                    logger.error(f"❌ Session status verification failed for {session_id}")
+                
+                # Prepare success message
+                success_msg = f"""✅ Upload successful!
 📊 Summary:
   • Total leads processed: {len(leads)}
+  • Verified in database: {verification_count}
   • New leads inserted: {insert_count}
   • Existing leads updated: {upsert_count}
+  • Failed uploads: {len(failed_uploads)}
   • Session ID: {session_id}
   • Database: sales_leads_db
   • Collection: business_leads"""
+                
+                if failed_uploads:
+                    success_msg += f"\n⚠️ Failed uploads:\n" + "\n".join(f"  • {fail}" for fail in failed_uploads)
+                
+                return success_msg
+            else:
+                # No leads were successfully uploaded
+                sessions_collection.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "status": "failed",
+                        "updated_at": datetime.now(timezone.utc),
+                        "error": "No leads verified in database"
+                    }},
+                    upsert=True
+                )
+                logger.error(f"❌ Upload failed: No leads verified in database for session {session_id}")
+                return f"❌ Upload failed: No leads were successfully stored in database"
             
         except Exception as e:
+            # Mark session as failed
+            try:
+                sessions_collection = get_sessions_collection()
+                sessions_collection.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "status": "failed",
+                        "updated_at": datetime.now(timezone.utc),
+                        "error": str(e)
+                    }},
+                    upsert=True
+                )
+            except:
+                pass  # Don't fail on session update failure
+            
+            logger.error(f"❌ MongoDB upload failed: {str(e)}")
             return f"❌ MongoDB upload failed: {str(e)}"
 
 

@@ -7,6 +7,7 @@ This implements the correct pattern:
 - Tasks with context relationships
 """
 
+import asyncio
 from typing import Dict, Any, List
 from crewai import Crew, Task, Process, Agent
 from ..prompts.research_prompts import RESEARCH_LEAD_PROMPT
@@ -19,6 +20,9 @@ from ..tools.phone_call_tool import phone_call_tool
 from ..tools.data_storage_tool import data_storage_tool
 from ..tools.email_sender_tool import email_sender_tool
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SDRAgent:
@@ -305,7 +309,7 @@ class SDRAgent:
         ]
 
 
-    def execute_workflow(self, business_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_workflow(self, business_data: Dict[str, Any], step_tracker=None) -> Dict[str, Any]:
         """
         Execute the complete SDR workflow using proper CrewAI orchestration.
         
@@ -336,8 +340,37 @@ class SDRAgent:
             print(f"\n=== EXECUTING SEQUENTIAL WORKFLOW ===")
             print("CrewAI will automatically execute: Research → Draft → Fact Check → Call → Classify → Clerk → Email")
             
-            # Kickoff the crew - CrewAI handles the orchestration
-            result = crew.kickoff()
+            # Track overall SDR workflow if step_tracker is provided
+            if step_tracker:
+                await step_tracker.start_step(
+                    "sdr_workflow",
+                    f"Processing SDR workflow for: {business_data.get('name', 'Unknown')}"
+                )
+            
+            # Kickoff the crew asynchronously - CrewAI handles the orchestration
+            result = await asyncio.to_thread(crew.kickoff)
+            
+            # Check if email was sent successfully by examining the final task output
+            email_sent_successfully = False
+            if tasks[6].output and hasattr(tasks[6].output, 'raw'):
+                email_output = tasks[6].output.raw
+                # Check if the email output indicates successful sending
+                if "Email sent successfully" in str(email_output) or "Message ID:" in str(email_output):
+                    email_sent_successfully = True
+            
+            if step_tracker:
+                if email_sent_successfully:
+                    await step_tracker.complete_step(
+                        "sdr_workflow",
+                        "SDR workflow completed - email sent successfully",
+                        {"email_sent": True, "email_result": str(tasks[6].output.raw) if tasks[6].output else "No email output"}
+                    )
+                else:
+                    await step_tracker.complete_step(
+                        "sdr_workflow",
+                        "SDR workflow completed",
+                        {"email_sent": False, "email_result": str(tasks[6].output.raw) if tasks[6].output else "No email output"}
+                    )
             
             print(f"\n=== SDR WORKFLOW COMPLETED ===")
             
@@ -352,16 +385,21 @@ class SDRAgent:
                 "classification_result": tasks[4].output.raw if tasks[4].output else "No classification output",
                 "clerk_result": tasks[5].output.raw if tasks[5].output else "No clerk output",
                 "email_result": tasks[6].output.raw if tasks[6].output else "No email output",
+                "email_sent": email_sent_successfully
             }
-            
-            # Email integration is now handled directly in the main workflow task
-            # No need for additional email system call since the email task already handles it
             
             return results
             
         except Exception as e:
             error_msg = f"Error in SDR orchestration: {str(e)}"
             print(f"\n=== ERROR: {error_msg} ===")
+            
+            if step_tracker:
+                await step_tracker.fail_step(
+                    "sdr_workflow",
+                    f"SDR workflow failed: {error_msg}"
+                )
+            
             return {
                 "business_data": business_data,
                 "status": "error",
@@ -373,12 +411,13 @@ class SDRAgent:
 sdr_main_agent = SDRAgent()
 
 
-def execute_sdr_main_workflow(business_data: Dict[str, Any]) -> Dict[str, Any]:
+async def execute_sdr_main_workflow(business_data: Dict[str, Any], step_tracker=None) -> Dict[str, Any]:
     """
     Convenience function to execute the SDR main agent workflow.
     
     Args:
         business_data: Dictionary containing business information
+        step_tracker: Optional WorkflowStepTracker for real-time updates
         
     Returns:
         Dictionary with unified lead finding results
@@ -392,7 +431,7 @@ def execute_sdr_main_workflow(business_data: Dict[str, Any]) -> Dict[str, Any]:
         ... }
         >>> results = execute_sdr_main_workflow(business_data)
     """
-    return sdr_main_agent.execute_workflow(business_data)
+    return await sdr_main_agent.execute_workflow(business_data, step_tracker)
 
 
 if __name__ == "__main__":
