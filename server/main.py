@@ -10,14 +10,14 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import agent modules
-from sdr.agents.sdr_main_agent import execute_sdr_main_workflow
-from sdr.agents.outreach_email_agent.sub_agents.email_sender.email_agent import send_outreach_email
-from sdr.tools.email_sender_tool import email_sender_tool
+from main_agent import run_main_agent_workflow
+from models import MainWorkflowRequest, MainWorkflowResponse
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -38,32 +38,24 @@ app.add_middleware(
 )
 
 # Pydantic models for request/response
-class BusinessData(BaseModel):
-    name: str
-    email: str
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    industry: Optional[str] = None
-    business_type: Optional[str] = None
-    website: Optional[str] = None
-    additional_info: Optional[Dict[str, Any]] = None
+class MainWorkflowRequest(BaseModel):
+    """Main workflow request model"""
+    city: str
+    business_type: str = "restaurants"
+    max_results: int = 3
+    search_radius: int = 5000
+    enable_sdr: bool = True
 
-class EmailRequest(BaseModel):
-    to_email: str
-    subject: str
-    body: str
-    is_html: bool = True
-
-class EmailAgentRequest(BaseModel):
-    business_data: BusinessData
-    research_result: str
-    proposal: str
-
-class LeadSearchRequest(BaseModel):
-    location: str
-    business_type: Optional[str] = None
-    radius: Optional[int] = 1000
-    limit: Optional[int] = 20
+class MainWorkflowResponse(BaseModel):
+    """Main workflow response model"""
+    success: bool
+    message: str
+    session_id: str
+    leads_count: int
+    sdr_results: List[Dict[str, Any]]
+    workflow_duration: float
+    status: str
+    timestamp: Optional[datetime] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -90,178 +82,104 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "endpoints": {
-            "leads": "/api/v1/leads",
-            "email": "/api/v1/email",
-            "workflow": "/api/v1/workflow"
+            "main_workflow": "/api/v1/workflow/main",
+            "main_workflow_async": "/api/v1/workflow/main-async",
+            "agents_status": "/api/v1/agents/status"
         }
     }
 
-# Lead Management Endpoints
-@app.post("/api/v1/leads/search")
-async def search_leads(request: LeadSearchRequest):
+# Main Agent Workflow Endpoints
+@app.post("/api/v1/workflow/main", response_model=MainWorkflowResponse)
+async def start_main_workflow(request: MainWorkflowRequest):
     """
-    Search for business leads in a specific location
+    Start the complete main agent workflow (Lead Finder + SDR)
+    
+    This is the primary endpoint that orchestrates the entire sales pipeline:
+    1. Discovers business leads using Lead Finder
+    2. Processes each lead through SDR workflow
+    3. Returns comprehensive results
     
     Args:
-        request: Lead search parameters
+        request: Main workflow parameters including city, business type, and SDR settings
         
     Returns:
-        List of found leads
+        Complete workflow results including leads and SDR processing
     """
     try:
-        # This would integrate with your leads_finder module
-        # For now, returning a mock response
-        return {
-            "success": True,
-            "message": "Lead search completed",
-            "leads": [
-                {
-                    "name": "Sample Business",
-                    "email": "contact@samplebusiness.com",
-                    "phone": "+1-555-0123",
-                    "address": "123 Main St, City, State",
-                    "industry": request.business_type or "General",
-                    "confidence_score": 0.85
-                }
-            ],
-            "total_found": 1,
-            "search_params": request.dict()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lead search failed: {str(e)}")
-
-# Email Endpoints
-@app.post("/api/v1/email/send")
-async def send_email(request: EmailRequest):
-    """
-    Send a single email using the email sender tool
-    
-    Args:
-        request: Email details
+        start_time = datetime.now()
         
-    Returns:
-        Email sending result
-    """
-    try:
-        result = email_sender_tool.send_email(
-            to_email=request.to_email,
-            subject=request.subject,
-            body=request.body,
-            is_html=request.is_html
+        # Execute main agent workflow
+        result = run_main_agent_workflow(
+            city=request.city,
+            business_type=request.business_type,
+            max_results=request.max_results,
+            search_radius=request.search_radius
         )
         
-        return {
-            "success": result.get("success", False),
-            "message": result.get("message", "Unknown error"),
-            "to_email": request.to_email,
-            "subject": request.subject
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Email sending failed: {str(e)}")
-
-@app.post("/api/v1/email/send-agent")
-async def send_email_with_agent(request: EmailAgentRequest):
-    """
-    Send email using the email agent system (crafter + sender)
-    
-    Args:
-        request: Business data, research, and proposal
+        execution_time = (datetime.now() - start_time).total_seconds()
         
-    Returns:
-        Email agent result
-    """
-    try:
-        result = send_outreach_email(
-            business_data=request.business_data.dict(),
-            research_result=request.research_result,
-            proposal=request.proposal
+        return MainWorkflowResponse(
+            success=result.get("success", False),
+            message=result.get("message", "Main workflow completed"),
+            session_id=result.get("session_id", "unknown"),
+            leads_count=result.get("leads_count", 0),
+            sdr_results=result.get("sdr_results", []),
+            workflow_duration=execution_time,
+            status=result.get("status", "unknown"),
+            timestamp=datetime.now()
         )
         
-        return {
-            "success": result.get("success", False),
-            "message": result.get("message", "Unknown error"),
-            "business_name": result.get("business_name"),
-            "email": result.get("email"),
-            "result": result.get("result")
-        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Email agent failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Main workflow failed: {str(e)}")
 
-# Workflow Endpoints
-@app.post("/api/v1/workflow/execute")
-async def execute_workflow(request: BusinessData, background_tasks: BackgroundTasks):
+@app.post("/api/v1/workflow/main-async")
+async def start_main_workflow_async(request: MainWorkflowRequest, background_tasks: BackgroundTasks):
     """
-    Execute the complete SDR workflow for a business
+    Start the complete main agent workflow asynchronously
+    
+    This endpoint runs the same workflow as the synchronous version but in the background.
+    Use this for long-running workflows to avoid timeout issues.
     
     Args:
-        request: Business information
+        request: Main workflow parameters
         background_tasks: FastAPI background tasks
         
     Returns:
-        Workflow execution result
+        Task ID for tracking the workflow progress
     """
     try:
-        # Convert to dict for the workflow
-        business_data = request.dict()
-        
-        # Execute workflow (this might take a while)
-        result = execute_sdr_main_workflow(business_data)
-        
-        return {
-            "success": result.get("status") == "completed",
-            "message": "SDR workflow completed",
-            "business_data": business_data,
-            "results": {
-                "research": result.get("research_result"),
-                "proposal": result.get("proposal_result"),
-                "call": result.get("call_result"),
-                "classification": result.get("classification_result"),
-                "email": result.get("email_result")
-            },
-            "workflow_status": result.get("status")
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Workflow execution failed: {str(e)}")
-
-@app.post("/api/v1/workflow/execute-async")
-async def execute_workflow_async(request: BusinessData, background_tasks: BackgroundTasks):
-    """
-    Execute the complete SDR workflow asynchronously
-    
-    Args:
-        request: Business information
-        background_tasks: FastAPI background tasks
-        
-    Returns:
-        Task ID for tracking
-    """
-    try:
-        business_data = request.dict()
-        
-        # Generate a task ID (in production, use a proper task queue)
-        task_id = f"workflow_{business_data['name'].replace(' ', '_').lower()}_{hash(str(business_data))}"
+        # Generate a task ID
+        task_id = f"main_workflow_{request.city.replace(' ', '_').lower()}_{request.business_type}_{hash(str(request.dict()))}"
         
         # Add to background tasks
-        background_tasks.add_task(execute_workflow_task, task_id, business_data)
+        background_tasks.add_task(execute_main_workflow_task, task_id, request.dict())
         
         return {
             "success": True,
-            "message": "Workflow started in background",
+            "message": "Main workflow started in background",
             "task_id": task_id,
-            "status": "running"
+            "status": "running",
+            "workflow_type": "main_agent",
+            "parameters": request.dict()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start workflow: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start main workflow: {str(e)}")
 
-# Background task function
-async def execute_workflow_task(task_id: str, business_data: Dict[str, Any]):
-    """Background task to execute workflow"""
+# Background task function for main workflow
+async def execute_main_workflow_task(task_id: str, workflow_params: Dict[str, Any]):
+    """Background task to execute main workflow"""
     try:
-        result = execute_sdr_main_workflow(business_data)
+        result = run_main_agent_workflow(
+            city=workflow_params["city"],
+            business_type=workflow_params["business_type"],
+            max_results=workflow_params["max_results"],
+            search_radius=workflow_params["search_radius"]
+        )
         # In production, store result in database or cache
-        print(f"Workflow {task_id} completed: {result.get('status')}")
+        print(f"Main workflow {task_id} completed: {result.get('status')}")
+        print(f"Leads processed: {result.get('leads_count', 0)}")
     except Exception as e:
-        print(f"Workflow {task_id} failed: {str(e)}")
+        print(f"Main workflow {task_id} failed: {str(e)}")
 
 # Agent Status Endpoints
 @app.get("/api/v1/agents/status")
